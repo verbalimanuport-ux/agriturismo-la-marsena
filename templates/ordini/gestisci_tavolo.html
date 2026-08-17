@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Tavolo {{ tavolo.numero }} - Ordine{% endblock %}
+{% block content %}
+<h1 class="mb-1">Tavolo {{ tavolo.numero }}</h1>
+<p class="text-muted mb-4">Zona: {{ tavolo.zona|default:"—" }} · Capienza: {{ tavolo.capienza }}</p>
+
+{% if ordine.prenotazione %}
+  <div class="alert alert-info">
+    Collegato alla prenotazione di <strong>{{ ordine.prenotazione.nome }}</strong>
+    ({{ ordine.prenotazione.telefono }}{% if ordine.prenotazione.telefono and ordine.prenotazione.email %} · {% endif %}{{ ordine.prenotazione.email }})
+    delle {{ ordine.prenotazione.ora|time:"H:i" }}.
+  </div>
+{% endif %}
+
+<form method="post" class="row g-2 align-items-end mb-2" style="max-width:350px;">
+  {% csrf_token %}
+  <input type="hidden" name="azione" value="aggiorna_coperti">
+  <div class="col-8">
+    <label class="form-label">Numero coperti (persone al tavolo)</label>
+    <input type="number" name="numero_coperti" min="1" value="{{ ordine.numero_coperti }}" class="form-control">
+  </div>
+  <div class="col-4">
+    <button type="submit" class="btn btn-outline-success w-100">Aggiorna</button>
+  </div>
+</form>
+{% if impostazioni.modalita_attiva == "fisso" %}
+  <p class="text-muted small mb-4">
+    Con il menù fisso attivo, impostare/aggiornare i coperti genera automaticamente
+    tutte le portate del menù fisso qui sotto (anche se una categoria ha più piatti,
+    es. 2 antipasti: escono entrambi per tutti).
+  </p>
+{% else %}
+  <div class="mb-4"></div>
+{% endif %}
+
+<form method="post" class="row g-2 align-items-end mb-4">
+  {% csrf_token %}
+  <input type="hidden" name="azione" value="aggiungi">
+  <div class="col-md-5">
+    {{ form.piatto.label_tag }}
+    {{ form.piatto }}
+  </div>
+  <div class="col-md-2">
+    {{ form.quantita.label_tag }}
+    {{ form.quantita }}
+  </div>
+  <div class="col-md-3">
+    {{ form.note.label_tag }}
+    {{ form.note }}
+  </div>
+  <div class="col-md-2">
+    <button type="submit" class="btn btn-success w-100">Aggiungi</button>
+  </div>
+</form>
+
+{% for giro in giri %}
+  <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
+    <span class="badge" style="background-color: var(--color-accent);">Giro {{ giro.numero }}</span>
+    {% if giro.stato_giro == "in_cucina" %}
+      <span class="badge bg-secondary">In cucina</span>
+    {% elif giro.stato_giro == "pronto" %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="azione" value="giro_servito">
+        <input type="hidden" name="portata" value="{{ giro.numero }}">
+        <button type="submit" class="btn btn-success btn-sm">✅ Pronto — Segna servito</button>
+      </form>
+    {% else %}
+      <span class="badge" style="background-color: var(--color-primary);">Servito</span>
+    {% endif %}
+  </div>
+
+  <div class="table-responsive mb-2">
+  <table class="table align-middle">
+    <thead><tr><th>Qtà</th><th>Piatto</th><th>Sposta a giro</th><th>Note</th><th>Da</th><th>Prezzo</th><th></th></tr></thead>
+    <tbody>
+      {% for riga in giro.righe %}
+      <tr>
+        <td>
+          <form method="post" class="d-flex align-items-center gap-1">
+            {% csrf_token %}
+            <input type="hidden" name="azione" value="cambia_quantita">
+            <input type="hidden" name="riga_id" value="{{ riga.id }}">
+            <input type="number" name="quantita" min="0" value="{{ riga.quantita }}" class="form-control form-control-sm" style="width:60px;">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">↻</button>
+          </form>
+        </td>
+        <td>{{ riga.piatto.nome }}</td>
+        <td>
+          <form method="post" class="d-flex align-items-center gap-1">
+            {% csrf_token %}
+            <input type="hidden" name="azione" value="cambia_portata">
+            <input type="hidden" name="riga_id" value="{{ riga.id }}">
+            <input type="number" name="portata" min="1" value="{{ riga.portata }}" class="form-control form-control-sm" style="width:60px;">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">↻</button>
+          </form>
+        </td>
+        <td>
+          <form method="post" class="d-flex align-items-center gap-1">
+            {% csrf_token %}
+            <input type="hidden" name="azione" value="cambia_note">
+            <input type="hidden" name="riga_id" value="{{ riga.id }}">
+            <input type="text" name="note" value="{{ riga.note }}" placeholder="es. senza cipolla" class="form-control form-control-sm" style="min-width:120px;">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">↻</button>
+          </form>
+        </td>
+        <td>{{ riga.inviato_da.username|default:riga.get_origine_display }}</td>
+        <td>
+          {% if impostazioni.modalita_attiva != "fisso" or riga.piatto.tipo_menu != "fisso" %}
+            &euro;{{ riga.subtotale }}
+          {% endif %}
+        </td>
+        <td>
+          <form method="post" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="azione" value="rimuovi">
+            <input type="hidden" name="riga_id" value="{{ riga.id }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger">Rimuovi</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+{% empty %}
+  <p class="text-muted">Nessun piatto ordinato per questo tavolo.</p>
+{% endfor %}
+
+<p class="text-muted small mb-4">
+  "Sposta a giro" = a cosa deve uscire insieme. Se un cliente salta l'antipasto e ordina
+  subito il secondo, imposta il suo secondo sullo stesso numero di giro degli antipasti
+  degli altri, e si sposterà in quel gruppo. "In cucina" = ancora da preparare. "Pronto" =
+  puoi andare a ritirarlo: premi "Segna servito" quando lo consegni al tavolo.
+</p>
+
+<div class="d-flex justify-content-between align-items-center mt-4 flex-wrap gap-3">
+  <p class="fs-4 fw-bold mb-0">Totale: &euro;{{ ordine.totale }}</p>
+  <form method="post" onsubmit="return confirm('Confermi la chiusura del conto per questo tavolo?');">
+    {% csrf_token %}
+    <input type="hidden" name="azione" value="chiudi_conto">
+    <button type="submit" class="btn btn-danger">Chiudi conto</button>
+  </form>
+</div>
+
+<a href="{% url 'ordini:sala' %}" class="btn btn-link mt-3 ps-0">&larr; Torna alla sala</a>
+{% endblock %}
+
+{% block extra_scripts %}{% include "partials/auto_refresh.html" %}{% endblock %}

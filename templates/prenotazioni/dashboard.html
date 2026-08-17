@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Dashboard prenotazioni{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="mb-0">Prenotazioni di oggi ({{ oggi|date:"d/m/Y" }})</h1>
+  <a href="/admin/prenotazioni/prenotazione/" class="btn btn-outline-secondary btn-sm">Vedi tutte (storico completo)</a>
+</div>
+
+<div class="table-responsive">
+<table class="table table-striped align-middle">
+  <thead>
+    <tr>
+      <th>Ora</th><th>Nome</th><th>Persone</th><th>Tavolo</th><th>Contatto</th>
+      <th>Stato</th><th>Lezione a cavallo</th><th>Note</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in prenotazioni_oggi %}
+    <tr>
+      <td>{{ p.ora|time:"H:i" }}</td>
+      <td>{{ p.nome }}</td>
+      <td>{{ p.numero_coperti }}</td>
+      <td>{{ p.tavolo|default:"da assegnare" }}</td>
+      <td>{{ p.telefono }} {{ p.email }}</td>
+      <td>
+        {% if p.stato == "arrivata" %}
+          <span class="badge" style="background-color: var(--color-charcoal);">Arrivata</span>
+        {% elif p.stato == "confermata" %}
+          <span class="badge" style="background-color: var(--color-primary);">Confermata</span>
+        {% else %}
+          <span class="badge" style="background-color: var(--color-accent);">In attesa</span>
+        {% endif %}
+      </td>
+      <td>{% if p.interesse_lezione_cavallo %}Sì{% else %}—{% endif %}</td>
+      <td>{{ p.note|default:"—" }}</td>
+      <td class="text-nowrap">
+        {% if p.stato != "arrivata" %}
+          {% if p.stato != "confermata" %}
+          <form method="post" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="prenotazione_id" value="{{ p.id }}">
+            <input type="hidden" name="azione" value="conferma">
+            <button type="submit" class="btn btn-sm btn-success">Conferma</button>
+          </form>
+          {% endif %}
+          <form method="post" class="d-inline-flex align-items-center gap-1 my-1">
+            {% csrf_token %}
+            <input type="hidden" name="prenotazione_id" value="{{ p.id }}">
+            <input type="hidden" name="azione" value="assegna_tavolo">
+            <select name="tavolo_id" class="form-select form-select-sm" style="width:auto;" required>
+              <option value="">Tavolo...</option>
+              {% for t in tavoli_attivi %}
+                <option value="{{ t.id }}">{{ t.numero }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-outline-success">Assegna</button>
+          </form>
+          <form method="post" class="d-inline" onsubmit="return confirm('Confermi l\'annullamento di questa prenotazione?');">
+            {% csrf_token %}
+            <input type="hidden" name="prenotazione_id" value="{{ p.id }}">
+            <input type="hidden" name="azione" value="annulla">
+            <button type="submit" class="btn btn-sm btn-outline-danger">Annulla</button>
+          </form>
+        {% else %}
+          <a href="{% url 'ordini:gestisci_tavolo' p.tavolo.id %}" class="btn btn-sm btn-outline-secondary">Vai al tavolo</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="9">Nessuna prenotazione per oggi.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<h2 class="mt-5">Prossime prenotazioni</h2>
+<div class="table-responsive">
+<table class="table table-striped align-middle">
+  <thead><tr><th>Data</th><th>Ora</th><th>Nome</th><th>Persone</th><th>Stato</th><th></th></tr></thead>
+  <tbody>
+    {% for p in prossime %}
+    <tr>
+      <td>{{ p.data|date:"d/m/Y" }}</td>
+      <td>{{ p.ora|time:"H:i" }}</td>
+      <td>{{ p.nome }}</td>
+      <td>{{ p.numero_coperti }}</td>
+      <td>
+        {% if p.stato == "confermata" %}
+          <span class="badge" style="background-color: var(--color-primary);">Confermata</span>
+        {% else %}
+          <span class="badge" style="background-color: var(--color-accent);">In attesa</span>
+        {% endif %}
+      </td>
+      <td class="text-nowrap">
+        {% if p.stato != "confermata" %}
+        <form method="post" class="d-inline">
+          {% csrf_token %}
+          <input type="hidden" name="prenotazione_id" value="{{ p.id }}">
+          <input type="hidden" name="azione" value="conferma">
+          <button type="submit" class="btn btn-sm btn-success">Conferma</button>
+        </form>
+        {% endif %}
+        <form method="post" class="d-inline" onsubmit="return confirm('Confermi l\'annullamento di questa prenotazione?');">
+          {% csrf_token %}
+          <input type="hidden" name="prenotazione_id" value="{{ p.id }}">
+          <input type="hidden" name="azione" value="annulla">
+          <button type="submit" class="btn btn-sm btn-outline-danger">Annulla</button>
+        </form>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6">Nessuna prenotazione in programma.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}{% include "partials/auto_refresh.html" %}{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Ordina - Tavolo {{ tavolo.numero }}{% endblock %}
+{% block content %}
+<h1 class="mb-1">Tavolo {{ tavolo.numero }}</h1>
+
+{% if solo_extra %}
+  <p class="text-muted mb-4">
+    Questa sera il menù è fisso: le portate sono già previste per il vostro tavolo.
+    Qui puoi ordinare da bere o altri extra.
+  </p>
+{% else %}
+  <p class="text-muted mb-4">Seleziona cosa desideri ordinare, puoi aggiungere più volte.</p>
+{% endif %}
+
+{% if form.errors %}
+  <div class="alert alert-danger">Controlla i dati inseriti.</div>
+{% endif %}
+
+<form method="post" class="row g-2 align-items-end mb-5">
+  {% csrf_token %}
+  <div class="col-md-6">
+    {{ form.piatto.label_tag }}
+    {{ form.piatto }}
+  </div>
+  <div class="col-md-2">
+    {{ form.quantita.label_tag }}
+    {{ form.quantita }}
+  </div>
+  <div class="col-md-3">
+    {{ form.note.label_tag }}
+    {{ form.note }}
+  </div>
+  <div class="col-md-1">
+    <button type="submit" class="btn btn-success w-100">+</button>
+  </div>
+</form>
+
+<h3>Il tuo tavolo</h3>
+<div class="table-responsive">
+<table class="table">
+  <thead><tr><th>Qtà</th><th>Piatto</th><th>Note</th><th>Prezzo</th></tr></thead>
+  <tbody>
+    {% for riga in ordine.righe.all %}
+    <tr>
+      <td>{{ riga.quantita }}</td>
+      <td>{{ riga.piatto.nome }}</td>
+      <td>{{ riga.note|default:"—" }}</td>
+      <td>
+        {% if impostazioni.modalita_attiva != "fisso" or riga.piatto.tipo_menu != "fisso" %}
+          &euro;{{ riga.subtotale }}
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4">Nessun ordine ancora.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="fs-5 fw-bold">Totale: &euro;{{ ordine.totale }}</p>
+<p class="text-muted small">Il conto verrà chiuso dallo staff a fine servizio.</p>
+{% endblock %}

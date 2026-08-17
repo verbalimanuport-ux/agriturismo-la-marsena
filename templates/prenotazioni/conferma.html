@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Prenotazione inviata{% endblock %}
+{% block content %}
+<div class="text-center p-5">
+  <h1 class="mb-3">Grazie!</h1>
+  <p class="fs-5">La tua richiesta di prenotazione è stata ricevuta.<br>Ti contatteremo a breve per confermarla.</p>
+  <a href="{% url 'home' %}" class="btn btn-outline-success mt-3">Torna alla home</a>
+</div>
+{% endblock %}
