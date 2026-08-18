@@ -1,20 +1,24 @@
 <script>
   // Auto-refresh "intelligente": ricarica la pagina da sola ogni tot secondi,
   // ma si mette in pausa se in quel momento si sta scrivendo in un campo
-  // (input, textarea, select) — riprova ogni secondo finché il campo non
-  // viene lasciato, così non si perde mai nulla di quello che si sta scrivendo.
+  // (input, textarea, select) o se la pagina stessa lo richiede impostando
+  // window.pausaAutoRefresh = true (es. mentre si trascina qualcosa sulla
+  // mappa) — riprova ogni secondo finché non è di nuovo libero, così non si
+  // perde mai nulla di quello che si sta facendo.
   (function () {
     var INTERVALLO_MS = 15000;
 
-    function campoInUsoOra() {
+    function occupatoOra() {
       var el = document.activeElement;
-      if (!el) return false;
-      var tag = el.tagName;
-      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+      if (el) {
+        var tag = el.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+      }
+      return window.pausaAutoRefresh === true;
     }
 
     function provaRicarica() {
-      if (campoInUsoOra()) {
+      if (occupatoOra()) {
         setTimeout(provaRicarica, 1000);
       } else {
         location.reload();

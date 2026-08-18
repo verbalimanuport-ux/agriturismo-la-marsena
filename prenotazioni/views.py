@@ -36,12 +36,14 @@ def _invia_notifiche_email(prenotazione):
     if prenotazione.email:
         try:
             send_mail(
-                subject="Richiesta di prenotazione ricevuta",
+                subject="Richiesta di prenotazione ricevuta (da confermare)",
                 message=(
                     f"Ciao {prenotazione.nome},\n\n"
                     f"Abbiamo ricevuto la tua richiesta di prenotazione per il {data_str} "
                     f"alle {ora_str}, per {prenotazione.numero_coperti} persone.\n\n"
-                    "Ti ricontatteremo a breve per confermarla.\n\n"
+                    "ATTENZIONE: questa richiesta non è ancora confermata. Ti chiameremo "
+                    f"al numero {prenotazione.telefono} il prima possibile per confermarla — "
+                    "considera la prenotazione definitiva solo dopo la nostra telefonata.\n\n"
                     "A presto!"
                 ),
                 from_email=settings.DEFAULT_FROM_EMAIL,

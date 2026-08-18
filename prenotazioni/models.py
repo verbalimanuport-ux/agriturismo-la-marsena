@@ -1,14 +1,24 @@
+import json
+
 from django.db import models
 
 
 class Tavolo(models.Model):
     """Un tavolo della sala. Numero, capienza e zona sono sempre modificabili
-    dallo staff dal pannello di gestione, senza bisogno di toccare il codice."""
+    dallo staff dal pannello di gestione, senza bisogno di toccare il codice.
+    pos_x/pos_y sono la posizione sulla mappa della sala (percentuale 0-100
+    rispetto all'area disegnata), impostata trascinando il tavolo sulla mappa."""
 
     numero = models.CharField(max_length=10, unique=True, verbose_name="Numero tavolo")
     capienza = models.PositiveIntegerField(verbose_name="Capienza (posti)")
     zona = models.CharField(max_length=100, blank=True, verbose_name="Zona / sala")
     attivo = models.BooleanField(default=True, verbose_name="Attivo (utilizzabile)")
+    pos_x = models.FloatField(
+        null=True, blank=True, verbose_name="Posizione X sulla mappa (%)"
+    )
+    pos_y = models.FloatField(
+        null=True, blank=True, verbose_name="Posizione Y sulla mappa (%)"
+    )
 
     class Meta:
         verbose_name = "Tavolo"
@@ -17,6 +27,38 @@ class Tavolo(models.Model):
 
     def __str__(self):
         return f"Tavolo {self.numero} ({self.capienza} posti)"
+
+
+class LayoutSala(models.Model):
+    """Riga unica: la forma (perimetro) della sala disegnata dallo staff,
+    come elenco di punti (poligono libero, non necessariamente un rettangolo).
+    Salvato come testo JSON: [{"x": 10, "y": 10}, {"x": 90, "y": 10}, ...]
+    (coordinate in percentuale, da 0 a 100)."""
+
+    perimetro_json = models.TextField(default="[]", blank=True, verbose_name="Perimetro (JSON)")
+
+    class Meta:
+        verbose_name = "Layout sala"
+        verbose_name_plural = "Layout sala"
+
+    def __str__(self):
+        return f"Layout sala ({len(self.punti)} punti)"
+
+    @property
+    def punti(self):
+        try:
+            return json.loads(self.perimetro_json)
+        except (ValueError, TypeError):
+            return []
+
+    @punti.setter
+    def punti(self, valore):
+        self.perimetro_json = json.dumps(valore)
+
+    @classmethod
+    def ottieni(cls):
+        obj, _creato = cls.objects.get_or_create(pk=1)
+        return obj
 
 
 class Prenotazione(models.Model):

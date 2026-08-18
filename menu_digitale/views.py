@@ -37,6 +37,8 @@ def impostazioni_menu(request):
         # Se il campo è lasciato vuoto, il prezzo precedente resta invariato
         # (non viene mai azzerato per errore).
 
+        impostazioni.ordini_qr_abilitati = request.POST.get("ordini_qr_abilitati") == "on"
+
         impostazioni.save()
         if not errore_prezzo:
             return redirect("menu_digitale:impostazioni")

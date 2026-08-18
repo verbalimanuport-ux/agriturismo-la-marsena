@@ -146,4 +146,7 @@
 <a href="{% url 'ordini:sala' %}" class="btn btn-link mt-3 ps-0">&larr; Torna alla sala</a>
 {% endblock %}
 
-{% block extra_scripts %}{% include "partials/auto_refresh.html" %}{% endblock %}
+{% block extra_scripts %}
+{% include "partials/auto_refresh.html" %}
+{% with chiave_notifica=chiave_notifica_tavolo valore_notifica=giri_pronti %}{% include "partials/notifica_sonora.html" %}{% endwith %}
+{% endblock %}

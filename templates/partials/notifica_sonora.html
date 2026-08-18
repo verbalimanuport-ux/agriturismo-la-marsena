@@ -1,0 +1,42 @@
+<script>
+  // Suono di avviso: confronta un numero (es. quanti piatti da preparare, o
+  // quanti giri pronti) con quello della volta scorsa su questa stessa
+  // pagina. Se è aumentato, suona un "ding" — utile per accorgersi di una
+  // novità anche senza guardare lo schermo in quel momento.
+  (function () {
+    var CHIAVE = "notifica_{{ chiave_notifica }}";
+    var valoreAttuale = {{ valore_notifica }};
+    var raw = sessionStorage.getItem(CHIAVE);
+    var valorePrecedente = raw === null ? null : parseInt(raw, 10);
+
+    if (valorePrecedente !== null && valoreAttuale > valorePrecedente) {
+      suonaAvviso();
+    }
+    sessionStorage.setItem(CHIAVE, valoreAttuale);
+
+    function suonaAvviso() {
+      try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        suonaNota(ctx, 880, 0);
+        suonaNota(ctx, 1100, 0.18);
+      } catch (e) {
+        // Niente audio disponibile in questo momento: pazienza, non blocca nulla.
+      }
+    }
+
+    function suonaNota(ctx, frequenza, ritardo) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      var inizio = ctx.currentTime + ritardo;
+      osc.frequency.setValueAtTime(frequenza, inizio);
+      gain.gain.setValueAtTime(0.0001, inizio);
+      gain.gain.exponentialRampToValueAtTime(0.25, inizio + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, inizio + 0.4);
+      osc.start(inizio);
+      osc.stop(inizio + 0.42);
+    }
+  })();
+</script>

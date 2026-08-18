@@ -45,6 +45,14 @@ class ImpostazioniMenu(models.Model):
         verbose_name="Prezzo menù fisso a persona (EUR)",
         help_text="Usato per calcolare il conto quando il tavolo ordina dal menù fisso.",
     )
+    ordini_qr_abilitati = models.BooleanField(
+        default=False,
+        verbose_name="Permetti ordini dal QR",
+        help_text=(
+            "Se spento (consigliato per iniziare), chi scansiona il QR del tavolo vede "
+            "solo il menù/la carta, senza poter ordinare. Il conto lo gestisce solo lo staff."
+        ),
+    )
 
     class Meta:
         verbose_name = "Impostazioni menù"

@@ -1,9 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Prenotazione inviata{% endblock %}
+{% block title %}Richiesta ricevuta{% endblock %}
 {% block content %}
 <div class="text-center p-5">
   <h1 class="mb-3">Grazie!</h1>
-  <p class="fs-5">La tua richiesta di prenotazione è stata ricevuta.<br>Ti contatteremo a breve per confermarla.</p>
-  <a href="{% url 'home' %}" class="btn btn-outline-success mt-3">Torna alla home</a>
+  <p class="fs-5 mb-4">Abbiamo ricevuto la tua richiesta di prenotazione.</p>
+  <div class="alert alert-warning d-inline-block text-start" style="max-width: 520px;">
+    <strong>⚠️ Attenzione: non è ancora confermata.</strong><br>
+    Ti chiameremo al numero che ci hai lasciato il prima possibile per confermarla —
+    considera la prenotazione definitiva solo dopo la nostra telefonata.
+  </div>
+  <div>
+    <a href="{% url 'home' %}" class="btn btn-outline-success mt-4">Torna alla home</a>
+  </div>
 </div>
 {% endblock %}

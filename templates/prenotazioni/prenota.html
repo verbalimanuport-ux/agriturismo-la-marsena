@@ -30,11 +30,12 @@
       {% for errore in form.nome.errors %}<div class="text-danger small">{{ errore }}</div>{% endfor %}
     </div>
     <div class="col-md-3">
-      <label class="form-label">Telefono</label>
+      <label class="form-label">Telefono <span class="text-danger">*</span></label>
       {{ form.telefono }}
+      {% for errore in form.telefono.errors %}<div class="text-danger small">{{ errore }}</div>{% endfor %}
     </div>
     <div class="col-md-3">
-      <label class="form-label">Email</label>
+      <label class="form-label">Email <span class="text-muted small">(facoltativa)</span></label>
       {{ form.email }}
     </div>
     <div class="col-md-4">

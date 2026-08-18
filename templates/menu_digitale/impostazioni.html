@@ -44,11 +44,23 @@
     </p>
   </div>
 
+  <div class="form-check mb-4 p-3 border rounded" style="background-color: var(--color-bg);">
+    <input class="form-check-input" type="checkbox" name="ordini_qr_abilitati" id="ordiniQr"
+      {% if impostazioni.ordini_qr_abilitati %}checked{% endif %}>
+    <label class="form-check-label fw-bold" for="ordiniQr">Permetti ordini dal QR</label>
+    <p class="text-muted small mb-0">
+      Se spenta (consigliato per iniziare), chi scansiona il QR del tavolo vede solo il
+      menù/la carta, senza poter ordinare — solo consultazione. Il cameriere continua a
+      poter gestire gli ordini normalmente dalla pagina del tavolo.
+    </p>
+  </div>
+
   <button type="submit" class="btn btn-success">Salva</button>
 </form>
 
 <p class="mt-4 small text-muted">
-  Per decidere se una categoria (es. "Antipasti", "Vini") fa parte del menù fisso o della carta,
-  vai su <a href="/admin/menu_digitale/categoria/">/admin/</a> e modifica il campo "Tipo di menù".
+  Per decidere se un piatto fa parte del menù fisso, della carta, o è sempre visibile
+  (es. vini), vai su <a href="/admin/menu_digitale/piatto/">/admin/</a> e modifica il
+  campo "Tipo di menù" — si imposta piatto per piatto, direttamente dalla lista.
 </p>
 {% endblock %}

@@ -35,18 +35,15 @@ class PrenotazioneForm(forms.ModelForm):
             ),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Il telefono è sempre obbligatorio: è lo strumento principale con cui
+        # lo staff richiama per confermare, specialmente per chi non lascia
+        # un'email. L'email resta facoltativa (un "di più" comodo se c'è).
+        self.fields["telefono"].required = True
+
     def clean_sito_web(self):
         valore = self.cleaned_data.get("sito_web")
         if valore:
             raise forms.ValidationError("Errore nella compilazione del modulo.")
         return valore
-
-    def clean(self):
-        cleaned_data = super().clean()
-        telefono = cleaned_data.get("telefono")
-        email = cleaned_data.get("email")
-        if not telefono and not email:
-            raise forms.ValidationError(
-                "Inserisci almeno un numero di telefono o un indirizzo email per poterti ricontattare."
-            )
-        return cleaned_data

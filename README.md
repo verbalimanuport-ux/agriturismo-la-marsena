@@ -462,7 +462,45 @@ Corretto anche un piccolo bug tecnico trovato per strada: in tre pagine (Cucina,
 tavolo, Dashboard prenotazioni) il blocco dell'auto-refresh era duplicato per errore — ora
 sistemato.
 
-## 36. Prossimo passo
+## 37. Blocco novità: QR solo consultazione, Mappa tavoli, conferma onesta, suono avviso
+
+Serve una nuova migrazione (due app coinvolte):
+
+```
+python manage.py migrate
+```
+
+### QR solo consultazione
+Nuovo interruttore in **Menù → Impostazioni**: "Permetti ordini dal QR", **spento di default**.
+Da spento, chi scansiona il QR del tavolo vede solo il menù/la carta, senza nessuna
+possibilità di ordinare — solo consultazione. Il cameriere continua a gestire tutto
+normalmente dalla pagina del tavolo. Riaccendibile in qualsiasi momento, stesso indirizzo QR.
+
+### Mappa tavoli
+Nuova voce **"Mappa tavoli"** nel menu Staff. Funziona così:
+- **Vista normale**: i tavoli colorati (grigio=libero, verde=aperto, rosso con numero=pronti
+  da ritirare) — clic su un tavolo apre la sua gestione, come dalla Sala
+- **"Modifica disposizione"**: entra in modalità modifica — trascina i tavoli per
+  posizionarli, clicca su un punto vuoto per aggiungere un angolo del perimetro della sala
+  (funziona per qualsiasi forma, non solo rettangoli — utile per la futura sala con più
+  pareti/zone), trascina i punti rossi per aggiustarli, "Salva disposizione" per confermare
+- L'aggiornamento automatico si mette in pausa mentre sei in modalità modifica, così non
+  perdi il lavoro fatto prima di salvare
+
+### Messaggio di conferma onesto
+La pagina dopo l'invio e l'email al cliente ora dicono chiaramente che la prenotazione
+**non è ancora confermata** — la conferma arriva con una telefonata dello staff.
+
+### Telefono obbligatorio
+Nel form di prenotazione il telefono è ora sempre richiesto; l'email resta facoltativa.
+
+### Suono di avviso
+Su Cucina, Sala e pagina del tavolo, un "ding" avvisa quando c'è una novità rilevante
+(nuovo piatto da preparare, un giro diventato pronto) — utile per accorgersene anche senza
+guardare lo schermo. Nota: alcuni browser richiedono un primo tocco/clic sulla pagina prima
+di poter riprodurre suoni — è una restrizione di sicurezza dei browser, non un difetto.
+
+## 38. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.

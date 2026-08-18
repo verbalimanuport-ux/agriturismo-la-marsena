@@ -1,11 +1,14 @@
+import json
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count
+from django.db.models import Count, Prefetch
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from menu_digitale.models import ImpostazioniMenu, Piatto
-from prenotazioni.models import Tavolo
+from menu_digitale.models import Categoria, ImpostazioniMenu, Piatto
+from prenotazioni.models import LayoutSala, Tavolo
 
 from .forms import AggiungiPiattoForm
 from .models import Ordine, RigaOrdine
@@ -47,12 +50,29 @@ def _genera_portate_standard_se_fisso(ordine, utente):
 
 def ordina_tavolo(request, numero_tavolo):
     """Pagina pubblica raggiungibile scansionando il QR code posato sul tavolo.
-    Nessun login richiesto. Con il menù fisso attivo, il cliente vede solo gli
-    'extra' da ordinare (bevande ecc.): le portate del menù fisso sono già
-    generate automaticamente in base ai coperti, non le sceglie il cliente."""
+    Nessun login richiesto.
+    - Se "Permetti ordini dal QR" è spento: il cliente vede SOLO il menù/la
+      carta, in sola consultazione, senza nessuna possibilità di ordinare.
+    - Se acceso e il menù fisso è attivo: il cliente vede solo gli 'extra' da
+      ordinare (bevande ecc.), le portate del menù fisso sono già generate
+      automaticamente in base ai coperti.
+    - Se acceso e la carta è attiva: il cliente sceglie e ordina normalmente."""
     tavolo = get_object_or_404(Tavolo, numero=numero_tavolo, attivo=True)
-    ordine = Ordine.per_tavolo_aperto(tavolo)
     impostazioni = ImpostazioniMenu.ottieni()
+
+    if not impostazioni.ordini_qr_abilitati:
+        piatti_attivi_qs = Piatto.attivi().order_by("ordine", "nome")
+        tutte_le_categorie = Categoria.objects.prefetch_related(
+            Prefetch("piatti", queryset=piatti_attivi_qs, to_attr="piatti_attivi")
+        ).order_by("ordine", "nome")
+        categorie = [c for c in tutte_le_categorie if c.piatti_attivi]
+        return render(
+            request,
+            "ordini/solo_menu_tavolo.html",
+            {"tavolo": tavolo, "categorie": categorie, "impostazioni": impostazioni},
+        )
+
+    ordine = Ordine.per_tavolo_aperto(tavolo)
     solo_extra = impostazioni.modalita_attiva == ImpostazioniMenu.MODALITA_FISSO
 
     if request.method == "POST":
@@ -102,12 +122,18 @@ def sala(request):
     }
 
     tavoli_con_ordine = []
+    totale_pronti = 0
     for t in tavoli:
         ordine = ordini_aperti.get(t.id)
         pronti = pronti_per_ordine.get(ordine.id, 0) if ordine else 0
+        totale_pronti += pronti
         tavoli_con_ordine.append((t, ordine, pronti))
 
-    return render(request, "ordini/sala.html", {"tavoli_con_ordine": tavoli_con_ordine})
+    return render(
+        request,
+        "ordini/sala.html",
+        {"tavoli_con_ordine": tavoli_con_ordine, "totale_pronti": totale_pronti},
+    )
 
 
 @login_required
@@ -218,10 +244,20 @@ def gestisci_tavolo(request, tavolo_id):
             stato_giro = "servito"
         giri.append({"numero": numero, "stato_giro": stato_giro, "righe": righe_giro})
 
+    giri_pronti = sum(1 for g in giri if g["stato_giro"] == "pronto")
+
     return render(
         request,
         "ordini/gestisci_tavolo.html",
-        {"tavolo": tavolo, "ordine": ordine, "form": form, "impostazioni": impostazioni, "giri": giri},
+        {
+            "tavolo": tavolo,
+            "ordine": ordine,
+            "form": form,
+            "impostazioni": impostazioni,
+            "giri": giri,
+            "giri_pronti": giri_pronti,
+            "chiave_notifica_tavolo": f"tavolo_{tavolo.id}",
+        },
     )
 
 
@@ -255,7 +291,11 @@ def cucina(request):
         tavolo = riga.ordine.tavolo
         tavoli_raggruppati.setdefault(tavolo, []).append(riga)
 
-    return render(request, "ordini/cucina.html", {"tavoli_raggruppati": tavoli_raggruppati.items()})
+    return render(
+        request,
+        "ordini/cucina.html",
+        {"tavoli_raggruppati": tavoli_raggruppati.items(), "totale_in_attesa": len(righe)},
+    )
 
 
 @login_required
@@ -266,3 +306,66 @@ def stampa_qr(request):
         (t, request.build_absolute_uri(f"/ordini/tavolo/{t.numero}/")) for t in tavoli
     ]
     return render(request, "ordini/stampa_qr.html", {"tavoli_con_url": tavoli_con_url})
+
+
+@login_required
+def mappa_tavoli(request):
+    """Mappa visiva della sala: perimetro disegnato a punti dallo staff,
+    tavoli posizionabili trascinandoli. Cliccando su un tavolo (fuori dalla
+    modalità modifica) si va alla sua pagina di gestione, come dalla Sala."""
+    if request.method == "POST":
+        try:
+            dati = json.loads(request.body)
+        except (ValueError, TypeError):
+            return JsonResponse({"ok": False, "errore": "Dati non validi."}, status=400)
+
+        for t in dati.get("tavoli", []):
+            Tavolo.objects.filter(id=t.get("id")).update(pos_x=t.get("x"), pos_y=t.get("y"))
+
+        layout = LayoutSala.ottieni()
+        layout.punti = dati.get("perimetro", [])
+        layout.save()
+        return JsonResponse({"ok": True})
+
+    tavoli_qs = Tavolo.objects.filter(attivo=True).order_by("numero")
+    ordini_aperti = {o.tavolo_id: o for o in Ordine.objects.filter(stato=Ordine.STATO_APERTO)}
+    pronti_per_ordine = {
+        r["ordine_id"]: r["totale"]
+        for r in RigaOrdine.objects.filter(
+            ordine__stato=Ordine.STATO_APERTO, stato=RigaOrdine.STATO_PRONTO
+        )
+        .values("ordine_id")
+        .annotate(totale=Count("id"))
+    }
+
+    tavoli_dati = []
+    for i, t in enumerate(tavoli_qs):
+        x, y = t.pos_x, t.pos_y
+        if x is None or y is None:
+            # posizione di partenza a griglia, finché lo staff non li trascina
+            colonne = 4
+            x = 15 + (i % colonne) * 25
+            y = 20 + (i // colonne) * 25
+        ordine = ordini_aperti.get(t.id)
+        pronti = pronti_per_ordine.get(ordine.id, 0) if ordine else 0
+        tavoli_dati.append(
+            {
+                "id": t.id,
+                "numero": t.numero,
+                "x": x,
+                "y": y,
+                "aperto": bool(ordine),
+                "totale": float(ordine.totale) if ordine else 0,
+                "pronti": pronti,
+            }
+        )
+
+    layout = LayoutSala.ottieni()
+    return render(
+        request,
+        "ordini/mappa_tavoli.html",
+        {
+            "tavoli_json": json.dumps(tavoli_dati),
+            "perimetro_json": layout.perimetro_json,
+        },
+    )

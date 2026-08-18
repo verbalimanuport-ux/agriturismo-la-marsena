@@ -52,4 +52,7 @@
 {% endfor %}
 {% endblock %}
 
-{% block extra_scripts %}{% include "partials/auto_refresh.html" %}{% endblock %}
+{% block extra_scripts %}
+{% include "partials/auto_refresh.html" %}
+{% with chiave_notifica="cucina" valore_notifica=totale_in_attesa %}{% include "partials/notifica_sonora.html" %}{% endwith %}
+{% endblock %}

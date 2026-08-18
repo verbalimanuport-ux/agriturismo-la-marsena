@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Mappa tavoli{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+  <h1 class="mb-0">Mappa della sala</h1>
+  <button id="btnModifica" type="button" class="btn btn-outline-success">Modifica disposizione</button>
+</div>
+<p class="text-muted mb-3">
+  Clicca su un tavolo per aprirne la gestione. Colori: <span style="color:#9c9c94;">■</span> libero,
+  <span style="color: var(--color-primary);">■</span> aperto,
+  <span style="color: var(--color-accent);">■</span> ha piatti pronti da ritirare (il numero sul badge).
+</p>
+
+<div id="pannelloModifica" class="alert alert-info" style="display:none;">
+  <strong>Modalità modifica attiva.</strong> Trascina i tavoli per posizionarli. Clicca su un punto
+  vuoto della mappa per aggiungere un angolo del perimetro della sala; trascina i punti rossi per
+  aggiustarli.
+  <div class="mt-2 d-flex gap-2 flex-wrap">
+    <button id="btnCancellaPerimetro" type="button" class="btn btn-sm btn-outline-danger">Cancella perimetro</button>
+    <button id="btnSalva" type="button" class="btn btn-sm btn-success">💾 Salva disposizione</button>
+  </div>
+</div>
+
+{% csrf_token %}
+<div id="mappaContainer" style="position:relative; width:100%; max-width:900px; aspect-ratio:4/3; background-color: var(--color-surface); border:2px dashed var(--color-border); border-radius: var(--radius-md); margin:0 auto; overflow:hidden; touch-action:none;">
+  <svg id="svgPerimetro" viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;">
+    <polygon id="poligonoPerimetro" points="" fill="rgba(70,89,47,0.08)" stroke="#46592F" stroke-width="0.5"/>
+  </svg>
+</div>
+
+<script id="datiTavoli" type="application/json">{{ tavoli_json|safe }}</script>
+<script id="datiPerimetro" type="application/json">{{ perimetro_json|safe }}</script>
+
+<script>
+(function () {
+  var tavoli = JSON.parse(document.getElementById('datiTavoli').textContent);
+  var perimetro = JSON.parse(document.getElementById('datiPerimetro').textContent);
+  var editMode = false;
+
+  var container = document.getElementById('mappaContainer');
+  var poligono = document.getElementById('poligonoPerimetro');
+  var btnModifica = document.getElementById('btnModifica');
+  var pannelloModifica = document.getElementById('pannelloModifica');
+
+  function abilitaTrascinamento(elemento, onMove) {
+    elemento.addEventListener('pointerdown', function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      elemento.setPointerCapture(ev.pointerId);
+
+      function muovi(ev2) {
+        var rect = container.getBoundingClientRect();
+        var x = ((ev2.clientX - rect.left) / rect.width) * 100;
+        var y = ((ev2.clientY - rect.top) / rect.height) * 100;
+        x = Math.max(0, Math.min(100, x));
+        y = Math.max(0, Math.min(100, y));
+        elemento.style.left = x + '%';
+        elemento.style.top = y + '%';
+        onMove(x, y);
+      }
+      function fine() {
+        elemento.removeEventListener('pointermove', muovi);
+        elemento.removeEventListener('pointerup', fine);
+      }
+      elemento.addEventListener('pointermove', muovi);
+      elemento.addEventListener('pointerup', fine);
+    });
+  }
+
+  function renderPerimetro() {
+    poligono.setAttribute('points', perimetro.map(function (p) { return p.x + ',' + p.y; }).join(' '));
+    var vecchi = container.querySelectorAll('.handle-perimetro');
+    for (var i = 0; i < vecchi.length; i++) { vecchi[i].remove(); }
+    if (editMode) {
+      perimetro.forEach(function (p, indice) {
+        var h = document.createElement('div');
+        h.className = 'handle-perimetro';
+        h.style.cssText = 'position:absolute; left:' + p.x + '%; top:' + p.y + '%; width:16px; height:16px; margin:-8px; border-radius:50%; background:#A3452C; border:2px solid #fff; cursor:grab; z-index:6;';
+        abilitaTrascinamento(h, function (x, y) { perimetro[indice] = { x: x, y: y }; renderPerimetro(); });
+        container.appendChild(h);
+      });
+    }
+  }
+
+  function renderTavoli() {
+    var vecchi = container.querySelectorAll('.marker-tavolo');
+    for (var i = 0; i < vecchi.length; i++) { vecchi[i].remove(); }
+    tavoli.forEach(function (t) {
+      var el = document.createElement('div');
+      el.className = 'marker-tavolo';
+      var colore = '#9c9c94';
+      if (t.aperto) colore = '#46592F';
+      if (t.pronti > 0) colore = '#A3452C';
+      el.style.cssText = 'position:absolute; left:' + t.x + '%; top:' + t.y + '%; width:58px; height:58px; margin:-29px; border-radius:12px; background:' + colore + '; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.25); z-index:10; font-family:Fraunces,serif; font-size:1.1rem;';
+      el.textContent = t.numero;
+      if (t.pronti > 0) {
+        var badge = document.createElement('span');
+        badge.textContent = t.pronti;
+        badge.style.cssText = 'position:absolute; top:-6px; right:-6px; background:#fff; color:#A3452C; border-radius:50%; width:20px; height:20px; font-size:11px; display:flex; align-items:center; justify-content:center; font-weight:700;';
+        el.appendChild(badge);
+      }
+      if (editMode) {
+        abilitaTrascinamento(el, function (x, y) { t.x = x; t.y = y; });
+      } else {
+        el.addEventListener('click', function () {
+          window.location.href = '/ordini/staff/tavolo/' + t.id + '/';
+        });
+      }
+      container.appendChild(el);
+    });
+  }
+
+  container.addEventListener('click', function (ev) {
+    if (!editMode) return;
+    if (ev.target.closest('.marker-tavolo') || ev.target.closest('.handle-perimetro')) return;
+    var rect = container.getBoundingClientRect();
+    var x = ((ev.clientX - rect.left) / rect.width) * 100;
+    var y = ((ev.clientY - rect.top) / rect.height) * 100;
+    perimetro.push({ x: x, y: y });
+    renderPerimetro();
+  });
+
+  btnModifica.addEventListener('click', function () {
+    editMode = !editMode;
+    window.pausaAutoRefresh = editMode;
+    btnModifica.textContent = editMode ? 'Esci da modifica' : 'Modifica disposizione';
+    pannelloModifica.style.display = editMode ? 'block' : 'none';
+    renderPerimetro();
+    renderTavoli();
+  });
+
+  document.getElementById('btnCancellaPerimetro').addEventListener('click', function () {
+    perimetro = [];
+    renderPerimetro();
+  });
+
+  document.getElementById('btnSalva').addEventListener('click', function () {
+    var token = document.querySelector('input[name=csrfmiddlewaretoken]').value;
+    fetch(window.location.pathname, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': token },
+      body: JSON.stringify({
+        tavoli: tavoli.map(function (t) { return { id: t.id, x: t.x, y: t.y }; }),
+        perimetro: perimetro
+      })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.ok) {
+          alert('Disposizione salvata!');
+        } else {
+          alert('Non è stato possibile salvare, riprova.');
+        }
+      })
+      .catch(function () { alert('Non è stato possibile salvare, riprova.'); });
+  });
+
+  renderPerimetro();
+  renderTavoli();
+})();
+</script>
+{% endblock %}
+
+{% block extra_scripts %}{% include "partials/auto_refresh.html" %}{% endblock %}
