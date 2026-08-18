@@ -54,62 +54,41 @@
 </form>
 
 {% if righe_bozza %}
+  <form method="post" id="formInvio">
+  {% csrf_token %}
+  <input type="hidden" name="azione" value="invia_cucina">
   <div class="card mb-4" style="border-color: var(--color-border);">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2" style="background-color: var(--color-bg);">
       <strong>📝 Da inviare ({{ righe_bozza|length }})</strong>
-      <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="azione" value="invia_cucina">
-        <button type="submit" class="btn btn-lg" style="background-color: var(--color-accent); color:#fff; font-weight:600;">
-          📤 Invia in cucina
-        </button>
-      </form>
+      <button type="submit" class="btn btn-lg" style="background-color: var(--color-accent); color:#fff; font-weight:600;">
+        📤 Invia in cucina
+      </button>
     </div>
     <div class="table-responsive mb-0">
       <table class="table align-middle mb-0">
-        <thead><tr><th>Qtà</th><th>Piatto</th><th>Sposta a giro</th><th>Note</th><th></th></tr></thead>
+        <thead><tr><th>Qtà</th><th>Piatto</th><th>Giro</th><th>Note per la cucina</th><th></th></tr></thead>
         <tbody>
           {% for riga in righe_bozza %}
           <tr>
             <td>
-              <form method="post" class="d-flex align-items-center gap-1">
-                {% csrf_token %}
-                <input type="hidden" name="azione" value="cambia_quantita">
-                <input type="hidden" name="riga_id" value="{{ riga.id }}">
-                <input type="number" name="quantita" min="0" value="{{ riga.quantita }}" class="form-control form-control-sm" style="width:60px;">
-                <button type="submit" class="btn btn-sm btn-outline-secondary">↻</button>
-              </form>
+              <input type="number" name="quantita_riga_{{ riga.id }}" min="0" value="{{ riga.quantita }}"
+                     class="form-control form-control-sm campo-auto" data-riga="{{ riga.id }}" data-campo="quantita" style="width:70px;">
             </td>
             <td>{{ riga.piatto.nome }}{% if not riga.piatto.categoria.richiede_cucina %} <span class="text-muted small">(extra)</span>{% endif %}</td>
             <td>
               {% if riga.piatto.categoria.richiede_cucina %}
-              <form method="post" class="d-flex align-items-center gap-1">
-                {% csrf_token %}
-                <input type="hidden" name="azione" value="cambia_portata">
-                <input type="hidden" name="riga_id" value="{{ riga.id }}">
-                <input type="number" name="portata" min="1" value="{{ riga.portata }}" class="form-control form-control-sm" style="width:60px;">
-                <button type="submit" class="btn btn-sm btn-outline-secondary">↻</button>
-              </form>
+                <input type="number" name="portata_riga_{{ riga.id }}" min="1" value="{{ riga.portata }}"
+                       class="form-control form-control-sm campo-auto" data-riga="{{ riga.id }}" data-campo="portata" style="width:70px;">
               {% else %}
                 <span class="text-muted">—</span>
               {% endif %}
             </td>
             <td>
-              <form method="post" class="d-flex align-items-center gap-1">
-                {% csrf_token %}
-                <input type="hidden" name="azione" value="cambia_note">
-                <input type="hidden" name="riga_id" value="{{ riga.id }}">
-                <input type="text" name="note" value="{{ riga.note }}" placeholder="es. senza cipolla" class="form-control form-control-sm" style="min-width:120px;">
-                <button type="submit" class="btn btn-sm btn-outline-secondary">↻</button>
-              </form>
+              <input type="text" name="nota_riga_{{ riga.id }}" value="{{ riga.note }}" placeholder="es. senza cipolla"
+                     class="form-control form-control-sm campo-auto" data-riga="{{ riga.id }}" data-campo="note" style="min-width:160px;">
             </td>
             <td>
-              <form method="post" class="d-inline">
-                {% csrf_token %}
-                <input type="hidden" name="azione" value="rimuovi">
-                <input type="hidden" name="riga_id" value="{{ riga.id }}">
-                <button type="submit" class="btn btn-sm btn-outline-danger">Rimuovi</button>
-              </form>
+              <button type="submit" form="rimuoviRiga{{ riga.id }}" class="btn btn-sm btn-outline-danger">Rimuovi</button>
             </td>
           </tr>
           {% endfor %}
@@ -117,6 +96,20 @@
       </table>
     </div>
   </div>
+  </form>
+
+  {% for riga in righe_bozza %}
+    <form method="post" id="rimuoviRiga{{ riga.id }}">
+      {% csrf_token %}
+      <input type="hidden" name="azione" value="rimuovi">
+      <input type="hidden" name="riga_id" value="{{ riga.id }}">
+    </form>
+  {% endfor %}
+
+  <p class="text-muted small mb-4">
+    ✅ Le modifiche (quantità, giro, note) si salvano da sole appena esci dal campo —
+    non serve premere nulla. Quando hai finito, premi "Invia in cucina".
+  </p>
 {% endif %}
 
 {% if da_consegnare %}
@@ -170,50 +163,25 @@
 
   <div class="table-responsive mb-2">
   <table class="table align-middle">
-    <thead><tr><th>Qtà</th><th>Piatto</th><th>Sposta a giro</th><th>Note</th><th>Da</th><th>Prezzo</th><th></th></tr></thead>
+    <thead><tr><th>Qtà</th><th>Piatto</th><th>Note</th><th>Da</th><th>Prezzo</th><th></th></tr></thead>
     <tbody>
       {% for riga in giro.righe %}
       <tr>
-        <td>
-          <form method="post" class="d-flex align-items-center gap-1">
-            {% csrf_token %}
-            <input type="hidden" name="azione" value="cambia_quantita">
-            <input type="hidden" name="riga_id" value="{{ riga.id }}">
-            <input type="number" name="quantita" min="0" value="{{ riga.quantita }}" class="form-control form-control-sm" style="width:60px;">
-            <button type="submit" class="btn btn-sm btn-outline-secondary">↻</button>
-          </form>
-        </td>
+        <td>{{ riga.quantita }}</td>
         <td>{{ riga.piatto.nome }}</td>
-        <td>
-          <form method="post" class="d-flex align-items-center gap-1">
-            {% csrf_token %}
-            <input type="hidden" name="azione" value="cambia_portata">
-            <input type="hidden" name="riga_id" value="{{ riga.id }}">
-            <input type="number" name="portata" min="1" value="{{ riga.portata }}" class="form-control form-control-sm" style="width:60px;">
-            <button type="submit" class="btn btn-sm btn-outline-secondary">↻</button>
-          </form>
-        </td>
-        <td>
-          <form method="post" class="d-flex align-items-center gap-1">
-            {% csrf_token %}
-            <input type="hidden" name="azione" value="cambia_note">
-            <input type="hidden" name="riga_id" value="{{ riga.id }}">
-            <input type="text" name="note" value="{{ riga.note }}" placeholder="es. senza cipolla" class="form-control form-control-sm" style="min-width:120px;">
-            <button type="submit" class="btn btn-sm btn-outline-secondary">↻</button>
-          </form>
-        </td>
+        <td>{{ riga.note|default:"—" }}</td>
         <td>{{ riga.inviato_da.username|default:riga.get_origine_display }}</td>
         <td>
           {% if impostazioni.modalita_attiva != "fisso" or riga.piatto.tipo_menu != "fisso" %}
             &euro;{{ riga.subtotale }}
           {% endif %}
         </td>
-        <td>
-          <form method="post" class="d-inline">
+        <td class="text-end">
+          <form method="post" class="d-inline" onsubmit="return confirm('Stornare {{ riga.piatto.nome|escapejs }} dal conto? Se è già in preparazione, avvisa anche la cucina di persona.');">
             {% csrf_token %}
-            <input type="hidden" name="azione" value="rimuovi">
+            <input type="hidden" name="azione" value="storna">
             <input type="hidden" name="riga_id" value="{{ riga.id }}">
-            <button type="submit" class="btn btn-sm btn-outline-danger">Rimuovi</button>
+            <button type="submit" class="btn btn-sm btn-outline-danger">Storna</button>
           </form>
         </td>
       </tr>
@@ -227,22 +195,57 @@
   {% endif %}
 {% endfor %}
 
-<p class="text-muted small mb-4">
-  "Sposta a giro" = a cosa deve uscire insieme. "Da inviare" = composto ma non ancora
-  mandato: premi "Invia in cucina" quando hai finito di aggiungere note/extra. "In cucina" =
-  il cuoco lo sta preparando. "Pronto" = vai a ritirarlo e consegnalo.
-</p>
-
 <div class="d-flex justify-content-between align-items-center mt-4 flex-wrap gap-3">
   <p class="fs-4 fw-bold mb-0">Totale: &euro;{{ ordine.totale }}</p>
-  <form method="post" onsubmit="return confirm('Confermi la chiusura del conto per questo tavolo?');">
-    {% csrf_token %}
-    <input type="hidden" name="azione" value="chiudi_conto">
-    <button type="submit" class="btn btn-danger">Chiudi conto</button>
-  </form>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{% url 'ordini:preconto' ordine.id %}" class="btn btn-outline-success">🧾 Preconto</a>
+    <form method="post" onsubmit="return confirm({% if voci_in_sospeso %}'ATTENZIONE: ci sono ancora {{ voci_in_sospeso }} voci non servite su questo tavolo.\n\nChiudere comunque il conto?'{% else %}'Confermi la chiusura del conto per questo tavolo?'{% endif %});">
+      {% csrf_token %}
+      <input type="hidden" name="azione" value="chiudi_conto">
+      <input type="hidden" name="forza" value="1">
+      <button type="submit" class="btn btn-danger">Chiudi conto</button>
+    </form>
+  </div>
 </div>
 
 <a href="{% url 'ordini:sala' %}" class="btn btn-link mt-3 ps-0">&larr; Torna alla sala</a>
+
+<script>
+// Salvataggio automatico: appena il cameriere esce da un campo (nota, quantità,
+// giro), la modifica viene salvata da sola in background — niente pulsanti da
+// premere, niente rischio di perdere una nota dimenticandosi di confermarla.
+(function () {
+  var token = document.querySelector('input[name=csrfmiddlewaretoken]').value;
+
+  document.querySelectorAll('.campo-auto').forEach(function (campo) {
+    campo.dataset.valorePrecedente = campo.value;
+
+    campo.addEventListener('blur', function () {
+      if (campo.value === campo.dataset.valorePrecedente) return;
+      campo.dataset.valorePrecedente = campo.value;
+
+      var tipo = campo.dataset.campo;
+      var azione = tipo === 'note' ? 'cambia_note' : (tipo === 'portata' ? 'cambia_portata' : 'cambia_quantita');
+
+      var dati = new FormData();
+      dati.append('csrfmiddlewaretoken', token);
+      dati.append('azione', azione);
+      dati.append('riga_id', campo.dataset.riga);
+      dati.append(tipo, campo.value);
+      dati.append('salvataggio_automatico', '1');
+
+      campo.style.borderColor = '#6E7F3D';
+      fetch(window.location.pathname, { method: 'POST', body: dati })
+        .then(function () {
+          campo.style.borderColor = '';
+        })
+        .catch(function () {
+          campo.style.borderColor = '#C23B3A';
+        });
+    });
+  });
+})();
+</script>
 {% endblock %}
 
 {% block extra_scripts %}

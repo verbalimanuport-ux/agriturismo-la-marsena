@@ -55,6 +55,17 @@
     </p>
   </div>
 
+  <div class="mb-4">
+    <label class="form-label fw-bold" for="sogliaRitardo">Dopo quanti minuti un piatto è "in ritardo" in cucina</label>
+    <input type="number" min="1" max="120" class="form-control" style="max-width:200px;"
+      id="sogliaRitardo" name="soglia_ritardo_cucina_minuti"
+      value="{{ impostazioni.soglia_ritardo_cucina_minuti }}">
+    <p class="text-muted small mt-1 mb-0">
+      In Cucina, un piatto in attesa da più di questi minuti viene evidenziato in rosso.
+      Alzalo se durante il servizio l'allarme scatta troppo spesso.
+    </p>
+  </div>
+
   <button type="submit" class="btn btn-success">Salva</button>
 </form>
 

@@ -47,9 +47,16 @@
   var pannelloModifica = document.getElementById('pannelloModifica');
 
   function dimensioneTavolo(capienza) {
-    // dimensione proporzionale ai posti: cresce circa 6px ogni 2 posti in più
-    var lato = 34 + (capienza || 2) * 6;
-    return Math.max(40, Math.min(96, lato));
+    // Larghezza a scaglioni, come tavoli affiancati: 2-3 posti = base,
+    // 4-5 = due tavoli affiancati, 6-7 = tre, e così via. L'altezza resta
+    // costante, così somigliano davvero a tavoli messi in fila.
+    var posti = capienza || 2;
+    var unita = Math.max(1, Math.ceil(posti / 2) - 0);
+    if (posti <= 3) unita = 1;
+    else if (posti <= 5) unita = 2;
+    else if (posti <= 7) unita = 3;
+    else unita = 4;
+    return { larghezza: 44 * unita, altezza: 44 };
   }
 
   function abilitaTrascinamento(elemento, onMove, trasforma) {
@@ -105,10 +112,15 @@
       perimetro.forEach(function (p, indice) {
         var h = document.createElement('div');
         h.className = 'handle-perimetro';
-        h.style.cssText = 'position:absolute; left:' + p.x + '%; top:' + p.y + '%; width:16px; height:16px; margin:-8px; border-radius:50%; background:#A3452C; border:2px solid #fff; cursor:grab; z-index:6;';
+        h.style.cssText = 'position:absolute; left:' + p.x + '%; top:' + p.y + '%; width:30px; height:30px; margin:-15px; border-radius:50%; background:#A3452C; border:3px solid #fff; cursor:grab; z-index:20; box-shadow:0 2px 6px rgba(0,0,0,0.3); touch-action:none;';
         abilitaTrascinamento(
           h,
-          function (x, y) { perimetro[indice] = { x: x, y: y }; renderPerimetro(); },
+          function (x, y) {
+            perimetro[indice] = { x: x, y: y };
+            // Aggiorno solo la linea, NON ridisegno i punti: ricrearli mentre
+            // il dito/mouse è premuto interrompeva il trascinamento.
+            poligono.setAttribute('points', perimetro.map(function (p) { return p.x + ',' + p.y; }).join(' '));
+          },
           function (x, y) { return magnetizzaPunto(indice, x, y); }
         );
         container.appendChild(h);
@@ -126,8 +138,8 @@
       if (t.aperto) colore = '#46592F';
       if (t.completo) colore = '#26282D';
       if (t.pronti > 0) colore = '#A3452C';
-      var lato = dimensioneTavolo(t.capienza);
-      el.style.cssText = 'position:absolute; left:' + t.x + '%; top:' + t.y + '%; width:' + lato + 'px; height:' + lato + 'px; margin:-' + (lato / 2) + 'px; border-radius:12px; background:' + colore + '; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.25); z-index:10; font-family:Fraunces,serif; font-size:1.1rem;';
+      var dim = dimensioneTavolo(t.capienza);
+      el.style.cssText = 'position:absolute; left:' + t.x + '%; top:' + t.y + '%; width:' + dim.larghezza + 'px; height:' + dim.altezza + 'px; margin-left:-' + (dim.larghezza / 2) + 'px; margin-top:-' + (dim.altezza / 2) + 'px; border-radius:10px; background:' + colore + '; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.25); z-index:10; font-family:Fraunces,serif; font-size:1.05rem;';
       el.textContent = t.numero;
       if (t.pronti > 0) {
         var badge = document.createElement('span');

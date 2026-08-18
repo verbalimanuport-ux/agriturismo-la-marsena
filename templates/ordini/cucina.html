@@ -37,7 +37,10 @@
                   Cameriere: {{ riga.inviato_da.username|default:riga.get_origine_display }}
                 </p>
                 {% if riga.note %}
-                  <p class="mb-0 small">Note: {{ riga.note }}</p>
+                  <div class="mt-2 p-2 d-flex align-items-start gap-2" style="background-color: #FFF4CC; border-left: 4px solid #E0A800; border-radius: 6px;">
+                    <span style="font-size: 1.1rem; line-height:1;">⚠️</span>
+                    <span class="fw-semibold" style="color: #6B4E00; font-size: 0.95rem;">{{ riga.note }}</span>
+                  </div>
                 {% endif %}
               </div>
             </div>

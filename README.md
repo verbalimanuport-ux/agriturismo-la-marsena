@@ -571,7 +571,77 @@ contiene i due video.
   rimpiazzare i due file mantenendo lo stesso nome (`azienda_agricola.mp4`,
   `md_ranch.mp4`) e ricaricare
 
-## 42. Prossimo passo
+## 43. Correzioni "anti-errore" e rifiniture
+
+Nessuna migrazione richiesta.
+
+### ⭐ Le note si salvano da sole (la più importante)
+Prima, se il cameriere scriveva una nota e dimenticava di premere ↻, la nota si perdeva
+inviando la comanda. **Ora**: quantità, giro e note si salvano **da sole** appena esci dal
+campo — nessun pulsante da premere. In più, per doppia sicurezza, il pulsante "Invia in
+cucina" raccoglie comunque tutte le note scritte in quel momento, anche se non fossero
+ancora state salvate. Impossibile perdere una nota.
+
+### Note molto più visibili in Cucina
+Le note ora appaiono in un riquadro giallo con bordo e icona ⚠️, non più come una riga di
+testo qualsiasi — impossibile non vederle durante il servizio.
+
+### Mappa: tavoli con dimensioni davvero diverse
+Nuova scala a scaglioni, come tavoli affiancati: 2-3 posti = un tavolo, 4-5 = largo il
+doppio, 6-7 = il triplo, 8+ = il quadruplo. La differenza ora è evidente a colpo d'occhio.
+
+### Mappa: punti del perimetro più facili da spostare
+I punti rossi sono ora molto più grandi (30px invece di 16px) e — soprattutto — corretto un
+difetto per cui a volte "si bloccavano" durante il trascinamento: il ridisegno continuo
+interrompeva il movimento. Ora si spostano sempre fluidamente.
+
+### Dashboard prenotazioni più leggibile
+Resta una tabella (come richiesto) ma molto più curata: righe più spaziose, orario in
+evidenza, contatti e note raccolti sotto il nome del cliente, badge "Lezione a cavallo",
+azioni allineate a destra, il tutto dentro una card con bordo e ombra.
+
+## 45. Audit finale — correzioni critiche e nuove funzionalità
+
+Due nuove migrazioni:
+
+```
+python manage.py migrate
+```
+
+### Correzioni critiche (audit)
+- **Prezzo menù fisso congelato** all'apertura del tavolo: cambiarlo a metà servizio non
+  altera più i conti già aperti (prima li ricalcolava retroattivamente!)
+- **Storno righe già inviate**: pulsante "Storna" su ogni piatto già mandato in cucina —
+  prima un errore restava sul conto per sempre. Se il piatto è già in preparazione, avvisa
+  di dirlo anche alla cucina di persona
+- **Tempo di attesa cucina corretto**: parte dall'invio, non da quando il cameriere ha
+  iniziato a comporre la comanda
+- **Avviso alla chiusura conto** se ci sono voci non ancora servite
+- Corretti: pulsante "Rimuovi" fragile, QR rotti con numeri tavolo contenenti spazi,
+  errori 500 sul salvataggio mappa, lentezza con molti tavoli aperti
+
+### 🧾 Preconto stampabile (nuovo)
+Pulsante **"Preconto"** sulla pagina del tavolo: apre un foglio pronto da stampare con
+logo, contatti, elenco consumazioni e totale. Include un campo **"Dividi il conto tra N"**
+per la divisione alla romana, con l'importo a testa calcolato.
+
+⚠️ **Importante**: è un documento di cortesia, **non uno scontrino fiscale** — quello va
+sempre emesso a parte con il registratore di cassa, come richiesto dalla legge.
+
+### 🔄 Conti chiusi e riapertura (nuovo)
+Nuova voce **"Conti chiusi"** nel menu Staff: elenco dei conti chiusi oggi, con il totale
+incassato in giornata a colpo d'occhio. Ogni conto ha:
+- **"Vedi conto"** — ristampa il preconto
+- **"Riapri"** — rimette il tavolo in servizio esattamente com'era (utile se chiuso per
+  errore). Bloccato se quel tavolo ha già un altro conto aperto. Le riaperture restano
+  tracciate ("riaperto 1×") per non perdere lo storico
+
+### ⏱️ Soglia ritardo cucina configurabile (nuovo)
+Da **Menù → Impostazioni**: quanti minuti prima che un piatto venga evidenziato in rosso
+in Cucina (prima era fisso a 15). Alzatelo se durante il servizio l'allarme scatta troppo
+spesso — un allarme che suona sempre viene ignorato.
+
+## 46. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.

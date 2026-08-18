@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Conti chiusi{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="mb-0">Conti chiusi di oggi ({{ oggi|date:"d/m/Y" }})</h1>
+  <div class="text-end">
+    <div class="small" style="color: var(--color-muted);">Totale giornata</div>
+    <div class="fs-4 fw-bold" style="color: var(--color-primary);">&euro;{{ incasso_giornata }}</div>
+  </div>
+</div>
+
+<p class="text-muted mb-4">
+  Se un tavolo è stato chiuso per errore, puoi riaprirlo da qui — torna esattamente com'era,
+  con tutte le sue consumazioni.
+</p>
+
+<div style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-tight); overflow: hidden;">
+<div class="table-responsive">
+<table class="table align-middle mb-0">
+  <thead style="background-color: var(--color-bg);">
+    <tr style="border-bottom: 2px solid var(--color-border);">
+      <th class="py-3 ps-4">Chiuso alle</th>
+      <th class="py-3">Tavolo</th>
+      <th class="py-3 text-center">Coperti</th>
+      <th class="py-3 text-end">Totale</th>
+      <th class="py-3 pe-4 text-end">Azioni</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for o in ordini %}
+    <tr style="border-bottom: 1px solid var(--color-border);">
+      <td class="py-3 ps-4 fw-bold" style="color: var(--color-primary);">{{ o.chiuso_il|time:"H:i" }}</td>
+      <td class="py-3">
+        <span class="fw-semibold">Tavolo {{ o.tavolo.numero }}</span>
+        {% if o.prenotazione %}
+          <div class="small" style="color: var(--color-muted);">{{ o.prenotazione.nome }}</div>
+        {% endif %}
+        {% if o.volte_riaperto %}
+          <div><span class="badge" style="background-color: var(--color-accent-soft); color: var(--color-accent-dark);">riaperto {{ o.volte_riaperto }}×</span></div>
+        {% endif %}
+      </td>
+      <td class="py-3 text-center">{{ o.numero_coperti }}</td>
+      <td class="py-3 text-end fw-bold">&euro;{{ o.totale }}</td>
+      <td class="py-3 pe-4">
+        <div class="d-flex gap-2 justify-content-end flex-wrap">
+          <a href="{% url 'ordini:preconto' o.id %}" class="btn btn-sm btn-outline-secondary">Vedi conto</a>
+          <form method="post" class="d-inline" onsubmit="return confirm('Riaprire il conto del tavolo {{ o.tavolo.numero }}?');">
+            {% csrf_token %}
+            <input type="hidden" name="ordine_id" value="{{ o.id }}">
+            <button type="submit" class="btn btn-sm btn-outline-success">Riapri</button>
+          </form>
+        </div>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" class="py-4 text-center" style="color: var(--color-muted);">Nessun conto chiuso oggi.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+</div>
+{% endblock %}

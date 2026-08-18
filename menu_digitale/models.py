@@ -62,6 +62,14 @@ class ImpostazioniMenu(models.Model):
             "solo il menù/la carta, senza poter ordinare. Il conto lo gestisce solo lo staff."
         ),
     )
+    soglia_ritardo_cucina_minuti = models.PositiveIntegerField(
+        default=15,
+        verbose_name="Dopo quanti minuti un piatto è 'in ritardo'",
+        help_text=(
+            "In Cucina, un piatto in attesa da più di questi minuti viene evidenziato "
+            "in rosso. Alzalo se durante il servizio l'allarme scatta troppo spesso."
+        ),
+    )
 
     class Meta:
         verbose_name = "Impostazioni menù"

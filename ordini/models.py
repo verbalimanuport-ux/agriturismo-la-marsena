@@ -34,11 +34,27 @@ class Ordine(models.Model):
         verbose_name="Numero coperti",
         help_text="Persone al tavolo: usato per calcolare il conto del menù fisso.",
     )
+    prezzo_menu_fisso_applicato = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Prezzo menù fisso applicato",
+        help_text=(
+            "Congelato all'apertura del tavolo: se il prezzo del menù fisso viene "
+            "cambiato a metà servizio, i conti già aperti non cambiano."
+        ),
+    )
     stato = models.CharField(
         max_length=10, choices=STATO_CHOICES, default=STATO_APERTO, verbose_name="Stato"
     )
     aperto_il = models.DateTimeField(auto_now_add=True, verbose_name="Aperto il")
     chiuso_il = models.DateTimeField(null=True, blank=True, verbose_name="Chiuso il")
+    volte_riaperto = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Volte riaperto",
+        help_text="Quante volte questo conto è stato riaperto dopo una chiusura.",
+    )
 
     class Meta:
         verbose_name = "Ordine"
@@ -50,9 +66,29 @@ class Ordine(models.Model):
 
     @classmethod
     def per_tavolo_aperto(cls, tavolo):
-        """Ottiene il conto aperto di un tavolo, creandolo se non esiste ancora."""
-        ordine, _creato = cls.objects.get_or_create(tavolo=tavolo, stato=cls.STATO_APERTO)
+        """Ottiene il conto aperto di un tavolo, creandolo se non esiste ancora.
+        Alla creazione congela il prezzo del menù fisso in vigore in quel
+        momento, così un cambio di prezzo a metà servizio non altera i conti
+        già aperti."""
+        ordine = cls.objects.filter(tavolo=tavolo, stato=cls.STATO_APERTO).first()
+        if ordine is not None:
+            return ordine
+        impostazioni = ImpostazioniMenu.ottieni()
+        ordine, _creato = cls.objects.get_or_create(
+            tavolo=tavolo,
+            stato=cls.STATO_APERTO,
+            defaults={"prezzo_menu_fisso_applicato": impostazioni.prezzo_menu_fisso_a_persona},
+        )
         return ordine
+
+    @property
+    def prezzo_fisso_effettivo(self):
+        """Il prezzo a persona da usare per questo conto: quello congelato
+        all'apertura, o quello attuale se il conto è precedente a questa
+        funzione (conti vecchi, campo ancora vuoto)."""
+        if self.prezzo_menu_fisso_applicato is not None:
+            return self.prezzo_menu_fisso_applicato
+        return ImpostazioniMenu.ottieni().prezzo_menu_fisso_a_persona
 
     @property
     def totale(self):
@@ -74,12 +110,21 @@ class Ordine(models.Model):
         ha_piatti_fissi = any(r.piatto.tipo_menu == Piatto.TIPO_FISSO for r in righe)
         totale_fisso = 0
         if ha_piatti_fissi:
-            totale_fisso = self.numero_coperti * impostazioni.prezzo_menu_fisso_a_persona
+            totale_fisso = self.numero_coperti * self.prezzo_fisso_effettivo
         return totale_fisso + totale_a_prezzo_singolo
 
     def chiudi(self):
         self.stato = self.STATO_CHIUSO
         self.chiuso_il = timezone.now()
+        self.save()
+
+    def riapri(self):
+        """Rimette il conto in stato aperto — serve quando un tavolo viene
+        chiuso per errore. Tiene traccia di quante volte è successo, così
+        resta visibile nello storico che quel conto è stato riaperto."""
+        self.stato = self.STATO_APERTO
+        self.chiuso_il = None
+        self.volte_riaperto = (self.volte_riaperto or 0) + 1
         self.save()
 
     @property
@@ -154,6 +199,12 @@ class RigaOrdine(models.Model):
     )
     note = models.CharField(max_length=200, blank=True, verbose_name="Note")
     creata_il = models.DateTimeField(auto_now_add=True, verbose_name="Aggiunta il")
+    inviata_il = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Inviata in cucina il",
+        help_text="Da qui parte il conteggio del tempo di attesa mostrato alla cucina.",
+    )
 
     class Meta:
         verbose_name = "Riga ordine"

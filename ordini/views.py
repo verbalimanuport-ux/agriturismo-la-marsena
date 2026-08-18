@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Prefetch
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from menu_digitale.models import Categoria, ImpostazioniMenu, Piatto
@@ -115,7 +116,12 @@ def sala(request):
     quali hanno piatti pronti da ritirare, e quali hanno finito il servizio
     (tutto servito, in attesa solo del conto)."""
     tavoli = Tavolo.objects.filter(attivo=True)
-    ordini_aperti = {o.tavolo_id: o for o in Ordine.objects.filter(stato=Ordine.STATO_APERTO)}
+    ordini_aperti = {
+        o.tavolo_id: o
+        for o in Ordine.objects.filter(stato=Ordine.STATO_APERTO).prefetch_related(
+            "righe__piatto__categoria"
+        )
+    }
 
     pronti_per_ordine = {
         r["ordine_id"]: r["totale"]
@@ -165,6 +171,34 @@ def gestisci_tavolo(request, tavolo_id):
 
     if request.method == "POST":
         azione = request.POST.get("azione")
+        salvataggio_automatico = request.POST.get("salvataggio_automatico") == "1"
+
+        if salvataggio_automatico:
+            # Salvataggio silenzioso in background (il cameriere è uscito da un
+            # campo): nessun messaggio, nessun ricaricamento della pagina.
+            riga_id = request.POST.get("riga_id")
+            if azione == "cambia_note":
+                RigaOrdine.objects.filter(id=riga_id, ordine=ordine).update(
+                    note=request.POST.get("note", "").strip()
+                )
+            elif azione == "cambia_portata":
+                try:
+                    valore = int(request.POST.get("portata"))
+                    if valore > 0:
+                        RigaOrdine.objects.filter(id=riga_id, ordine=ordine).update(portata=valore)
+                except (TypeError, ValueError):
+                    pass
+            elif azione == "cambia_quantita":
+                try:
+                    valore = int(request.POST.get("quantita"))
+                    if valore > 0:
+                        RigaOrdine.objects.filter(id=riga_id, ordine=ordine).update(quantita=valore)
+                    else:
+                        RigaOrdine.objects.filter(id=riga_id, ordine=ordine).delete()
+                except (TypeError, ValueError):
+                    pass
+            return JsonResponse({"ok": True})
+
         if azione == "aggiungi":
             form = AggiungiPiattoForm(request.POST)
             if form.is_valid():
@@ -215,17 +249,32 @@ def gestisci_tavolo(request, tavolo_id):
             except (TypeError, ValueError):
                 pass
         elif azione == "invia_cucina":
+            # Rete di sicurezza: raccoglie anche le note appena scritte dal
+            # cameriere e non ancora salvate singolarmente, così non si perde
+            # mai nulla anche se si dimentica di confermarle.
+            for chiave, valore in request.POST.items():
+                if chiave.startswith("nota_riga_"):
+                    try:
+                        riga_id = int(chiave.replace("nota_riga_", ""))
+                    except ValueError:
+                        continue
+                    RigaOrdine.objects.filter(id=riga_id, ordine=ordine).update(
+                        note=valore.strip()
+                    )
+
             righe_da_inviare = list(
                 ordine.righe.filter(stato=RigaOrdine.STATO_BOZZA).select_related("piatto__categoria")
             )
+            adesso_invio = timezone.now()
             for riga in righe_da_inviare:
                 if riga.piatto.categoria.richiede_cucina:
                     riga.stato = RigaOrdine.STATO_IN_ATTESA
                 else:
                     riga.stato = RigaOrdine.STATO_PRONTO
+                riga.inviata_il = adesso_invio
                 riga.save()
             if righe_da_inviare:
-                messages.success(request, "Ordine inviato!")
+                messages.success(request, f"Ordine inviato! ({len(righe_da_inviare)} voci)")
             else:
                 messages.info(request, "Non c'era nulla da inviare.")
         elif azione == "giro_servito":
@@ -234,6 +283,21 @@ def gestisci_tavolo(request, tavolo_id):
                 ordine=ordine, portata=portata, stato=RigaOrdine.STATO_PRONTO
             ).update(stato=RigaOrdine.STATO_SERVITO)
             messages.success(request, f"Giro {portata} segnato come servito.")
+        elif azione == "storna":
+            riga_id = request.POST.get("riga_id")
+            riga = RigaOrdine.objects.filter(id=riga_id, ordine=ordine).select_related("piatto").first()
+            if riga is not None:
+                nome_piatto = riga.piatto.nome
+                era_in_cucina = riga.stato == RigaOrdine.STATO_IN_ATTESA
+                riga.delete()
+                if era_in_cucina:
+                    messages.warning(
+                        request,
+                        f"{nome_piatto} stornato dal conto — era già in preparazione: "
+                        "avvisa la cucina di persona!",
+                    )
+                else:
+                    messages.success(request, f"{nome_piatto} stornato dal conto.")
         elif azione == "consegnato":
             riga_id = request.POST.get("riga_id")
             RigaOrdine.objects.filter(
@@ -251,6 +315,15 @@ def gestisci_tavolo(request, tavolo_id):
             except (TypeError, ValueError):
                 pass
         elif azione == "chiudi_conto":
+            in_sospeso = ordine.righe.exclude(stato=RigaOrdine.STATO_SERVITO).count()
+            forzato = request.POST.get("forza") == "1"
+            if in_sospeso and not forzato:
+                messages.error(
+                    request,
+                    f"Attenzione: ci sono ancora {in_sospeso} voci non servite. "
+                    "Controlla il tavolo e premi di nuovo per chiudere comunque.",
+                )
+                return redirect("ordini:gestisci_tavolo", tavolo_id=tavolo.id)
             totale = ordine.totale
             ordine.chiudi()
             messages.success(
@@ -309,6 +382,9 @@ def gestisci_tavolo(request, tavolo_id):
             "giri": giri,
             "giri_pronti": giri_pronti,
             "da_consegnare": da_consegnare,
+            "voci_in_sospeso": sum(
+                1 for r in tutte_le_righe if r.stato != RigaOrdine.STATO_SERVITO
+            ),
             "chiave_notifica_tavolo": f"tavolo_{tavolo.id}",
         },
     )
@@ -341,10 +417,14 @@ def cucina(request):
     )
 
     adesso = timezone.now()
+    soglia = ImpostazioniMenu.ottieni().soglia_ritardo_cucina_minuti or SOGLIA_ATTESA_MINUTI
     tavoli_raggruppati = {}
     for riga in righe:
-        riga.minuti_attesa = int((adesso - riga.creata_il).total_seconds() // 60)
-        riga.in_ritardo = riga.minuti_attesa >= SOGLIA_ATTESA_MINUTI
+        # Il tempo di attesa parte da quando la comanda è stata INVIATA, non da
+        # quando il cameriere l'ha composta (poteva restare in bozza a lungo).
+        riferimento = riga.inviata_il or riga.creata_il
+        riga.minuti_attesa = int((adesso - riferimento).total_seconds() // 60)
+        riga.in_ritardo = riga.minuti_attesa >= soglia
         tavolo = riga.ordine.tavolo
         tavoli_raggruppati.setdefault(tavolo, []).append(riga)
 
@@ -360,7 +440,13 @@ def stampa_qr(request):
     """Pagina con i QR code di tutti i tavoli attivi, pronta da stampare."""
     tavoli = Tavolo.objects.filter(attivo=True)
     tavoli_con_url = [
-        (t, request.build_absolute_uri(f"/ordini/tavolo/{t.numero}/")) for t in tavoli
+        (
+            t,
+            request.build_absolute_uri(
+                reverse("ordini:ordina_tavolo", kwargs={"numero_tavolo": t.numero})
+            ),
+        )
+        for t in tavoli
     ]
     return render(request, "ordini/stampa_qr.html", {"tavoli_con_url": tavoli_con_url})
 
@@ -378,16 +464,48 @@ def mappa_tavoli(request):
         except (ValueError, TypeError):
             return JsonResponse({"ok": False, "errore": "Dati non validi."}, status=400)
 
+        def _coordinata_valida(valore):
+            try:
+                numero = float(valore)
+            except (TypeError, ValueError):
+                return None
+            if numero != numero:  # scarta i valori "non numerici" (NaN)
+                return None
+            return max(0.0, min(100.0, numero))
+
         for t in dati.get("tavoli", []):
-            Tavolo.objects.filter(id=t.get("id")).update(pos_x=t.get("x"), pos_y=t.get("y"))
+            x = _coordinata_valida(t.get("x"))
+            y = _coordinata_valida(t.get("y"))
+            if x is None or y is None:
+                continue
+            try:
+                tavolo_id = int(t.get("id"))
+            except (TypeError, ValueError):
+                continue
+            Tavolo.objects.filter(id=tavolo_id).update(pos_x=x, pos_y=y)
+
+        punti_validi = []
+        for p in dati.get("perimetro", []):
+            if not isinstance(p, dict):
+                continue
+            x = _coordinata_valida(p.get("x"))
+            y = _coordinata_valida(p.get("y"))
+            if x is None or y is None:
+                continue
+            punti_validi.append({"x": round(x, 2), "y": round(y, 2)})
 
         layout = LayoutSala.ottieni()
-        layout.punti = dati.get("perimetro", [])
+        layout.punti = punti_validi
         layout.save()
         return JsonResponse({"ok": True})
 
     tavoli_qs = Tavolo.objects.filter(attivo=True).order_by("numero")
-    ordini_aperti = {o.tavolo_id: o for o in Ordine.objects.filter(stato=Ordine.STATO_APERTO)}
+    ordini_aperti = {
+        o.tavolo_id: o
+        for o in Ordine.objects.filter(stato=Ordine.STATO_APERTO).prefetch_related(
+            "righe__piatto__categoria"
+        )
+    }
     pronti_per_ordine = {
         r["ordine_id"]: r["totale"]
         for r in RigaOrdine.objects.filter(
@@ -430,4 +548,93 @@ def mappa_tavoli(request):
             "tavoli_json": json.dumps(tavoli_dati),
             "perimetro_json": layout.perimetro_json,
         },
+    )
+
+
+@login_required
+def preconto(request, ordine_id):
+    """Preconto stampabile da portare al tavolo, con la possibilità di
+    dividerlo tra più persone ("alla romana").
+
+    ATTENZIONE: è un documento di cortesia per far vedere al cliente cosa ha
+    consumato, NON uno scontrino fiscale — quello va sempre emesso a parte con
+    il registratore di cassa."""
+    ordine = get_object_or_404(
+        Ordine.objects.select_related("tavolo", "prenotazione"), id=ordine_id
+    )
+    impostazioni = ImpostazioniMenu.ottieni()
+
+    righe = list(
+        ordine.righe.select_related("piatto__categoria").order_by("portata", "creata_il")
+    )
+
+    # Righe fatturate a prezzo singolo (carta, vini, bibite...)
+    modalita_fissa = impostazioni.modalita_attiva == ImpostazioniMenu.MODALITA_FISSO
+    voci_singole = []
+    coperti_menu_fisso = 0
+    for r in righe:
+        if modalita_fissa and r.piatto.tipo_menu == Piatto.TIPO_FISSO:
+            coperti_menu_fisso = ordine.numero_coperti
+            continue
+        voci_singole.append(r)
+
+    totale = ordine.totale
+    try:
+        dividi_per = int(request.GET.get("dividi", ordine.numero_coperti) or 1)
+    except (TypeError, ValueError):
+        dividi_per = ordine.numero_coperti
+    dividi_per = max(1, min(dividi_per, 50))
+    quota = (totale / dividi_per) if dividi_per else totale
+
+    return render(
+        request,
+        "ordini/preconto.html",
+        {
+            "ordine": ordine,
+            "tavolo": ordine.tavolo,
+            "voci_singole": voci_singole,
+            "coperti_menu_fisso": coperti_menu_fisso,
+            "prezzo_fisso": ordine.prezzo_fisso_effettivo,
+            "totale": totale,
+            "dividi_per": dividi_per,
+            "quota": quota,
+            "adesso": timezone.now(),
+        },
+    )
+
+
+@login_required
+def conti_chiusi(request):
+    """Storico dei conti chiusi di oggi, con la possibilità di riaprirne uno
+    chiuso per errore (solo se il tavolo non ha già un altro conto aperto)."""
+    if request.method == "POST":
+        ordine_id = request.POST.get("ordine_id")
+        ordine = get_object_or_404(Ordine, id=ordine_id, stato=Ordine.STATO_CHIUSO)
+        gia_aperto = Ordine.objects.filter(
+            tavolo=ordine.tavolo, stato=Ordine.STATO_APERTO
+        ).exists()
+        if gia_aperto:
+            messages.error(
+                request,
+                f"Il tavolo {ordine.tavolo.numero} ha già un altro conto aperto: "
+                "chiudi prima quello, poi riprova.",
+            )
+        else:
+            ordine.riapri()
+            messages.success(request, f"Conto del tavolo {ordine.tavolo.numero} riaperto.")
+            return redirect("ordini:gestisci_tavolo", tavolo_id=ordine.tavolo_id)
+        return redirect("ordini:conti_chiusi")
+
+    oggi = timezone.localdate()
+    ordini = (
+        Ordine.objects.filter(stato=Ordine.STATO_CHIUSO, chiuso_il__date=oggi)
+        .select_related("tavolo", "prenotazione")
+        .prefetch_related("righe__piatto__categoria")
+        .order_by("-chiuso_il")
+    )
+    incasso_giornata = sum((o.totale for o in ordini), start=0)
+    return render(
+        request,
+        "ordini/conti_chiusi.html",
+        {"ordini": ordini, "oggi": oggi, "incasso_giornata": incasso_giornata},
     )

@@ -3,37 +3,57 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
   <h1 class="mb-0">Prenotazioni di oggi ({{ oggi|date:"d/m/Y" }})</h1>
-  <a href="/admin/prenotazioni/prenotazione/" class="btn btn-outline-secondary btn-sm">Vedi tutte (storico completo)</a>
+  <a href="/admin/prenotazioni/prenotazione/" class="btn btn-outline-secondary btn-sm">Storico completo</a>
 </div>
 
+<div style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-tight); overflow: hidden;">
 <div class="table-responsive">
-<table class="table table-striped align-middle">
-  <thead>
-    <tr>
-      <th>Ora</th><th>Nome</th><th>Persone</th><th>Tavolo</th><th>Contatto</th>
-      <th>Stato</th><th>Lezione a cavallo</th><th>Note</th><th></th>
+<table class="table align-middle mb-0">
+  <thead style="background-color: var(--color-bg);">
+    <tr style="border-bottom: 2px solid var(--color-border);">
+      <th class="py-3 ps-4" style="width:80px;">Ora</th>
+      <th class="py-3">Cliente</th>
+      <th class="py-3 text-center" style="width:80px;">Pers.</th>
+      <th class="py-3">Tavolo</th>
+      <th class="py-3 text-center">Stato</th>
+      <th class="py-3 pe-4 text-end">Azioni</th>
     </tr>
   </thead>
   <tbody>
     {% for p in prenotazioni_oggi %}
-    <tr>
-      <td>{{ p.ora|time:"H:i" }}</td>
-      <td>{{ p.nome }}</td>
-      <td>{{ p.numero_coperti }}</td>
-      <td>{{ p.tavolo|default:"da assegnare" }}</td>
-      <td>{{ p.telefono }} {{ p.email }}</td>
-      <td>
+    <tr style="border-bottom: 1px solid var(--color-border);">
+      <td class="py-3 ps-4 fw-bold" style="font-size:1.05rem; color: var(--color-primary);">{{ p.ora|time:"H:i" }}</td>
+      <td class="py-3">
+        <div class="fw-semibold">{{ p.nome }}</div>
+        <div class="small" style="color: var(--color-muted);">
+          {{ p.telefono }}{% if p.email %} · {{ p.email }}{% endif %}
+        </div>
+        {% if p.note or p.interesse_lezione_cavallo %}
+          <div class="small mt-1">
+            {% if p.interesse_lezione_cavallo %}<span class="badge" style="background-color: var(--color-accent-soft); color: var(--color-accent-dark);">🐴 Lezione a cavallo</span>{% endif %}
+            {% if p.note %}<span style="color: var(--color-muted);">{{ p.note }}</span>{% endif %}
+          </div>
+        {% endif %}
+      </td>
+      <td class="py-3 text-center fw-bold">{{ p.numero_coperti }}</td>
+      <td class="py-3">
+        {% if p.tavolo %}
+          <span class="fw-semibold">{{ p.tavolo.numero }}</span>
+        {% else %}
+          <span style="color: var(--color-muted);">—</span>
+        {% endif %}
+      </td>
+      <td class="py-3 text-center">
         {% if p.stato == "arrivata" %}
           <span class="badge" style="background-color: var(--color-charcoal);">Arrivata</span>
         {% elif p.stato == "confermata" %}
           <span class="badge" style="background-color: var(--color-primary);">Confermata</span>
         {% else %}
-          <span class="badge" style="background-color: var(--color-accent);">In attesa</span>
+          <span class="badge" style="background-color: var(--color-accent);">Da confermare</span>
         {% endif %}
       </td>
-      <td>{% if p.interesse_lezione_cavallo %}Sì{% else %}—{% endif %}</td>
-      <td>{{ p.note|default:"—" }}</td>
-      <td class="text-nowrap">
+      <td class="py-3 pe-4">
+        <div class="d-flex gap-2 justify-content-end align-items-center flex-wrap">
         {% if p.stato != "arrivata" %}
           {% if p.stato != "confermata" %}
           <form method="post" class="d-inline">
@@ -43,12 +63,12 @@
             <button type="submit" class="btn btn-sm btn-success">Conferma</button>
           </form>
           {% endif %}
-          <form method="post" class="d-inline-flex align-items-center gap-1 my-1">
+          <form method="post" class="d-inline-flex align-items-center gap-1">
             {% csrf_token %}
             <input type="hidden" name="prenotazione_id" value="{{ p.id }}">
             <input type="hidden" name="azione" value="assegna_tavolo">
             <select name="tavolo_id" class="form-select form-select-sm" style="width:auto;" required>
-              <option value="">Tavolo...</option>
+              <option value="">Tavolo…</option>
               {% for t in tavoli_attivi %}
                 <option value="{{ t.id }}">{{ t.numero }}</option>
               {% endfor %}
@@ -62,36 +82,52 @@
             <button type="submit" class="btn btn-sm btn-outline-danger">Annulla</button>
           </form>
         {% else %}
-          <a href="{% url 'ordini:gestisci_tavolo' p.tavolo.id %}" class="btn btn-sm btn-outline-secondary">Vai al tavolo</a>
+          <a href="{% url 'ordini:gestisci_tavolo' p.tavolo.id %}" class="btn btn-sm" style="background-color: var(--color-primary); color:#fff;">Vai al tavolo →</a>
         {% endif %}
+        </div>
       </td>
     </tr>
     {% empty %}
-    <tr><td colspan="9">Nessuna prenotazione per oggi.</td></tr>
+    <tr><td colspan="6" class="py-4 text-center" style="color: var(--color-muted);">Nessuna prenotazione per oggi.</td></tr>
     {% endfor %}
   </tbody>
 </table>
 </div>
+</div>
 
-<h2 class="mt-5">Prossime prenotazioni</h2>
+<h2 class="mt-5 mb-3">Prossime prenotazioni</h2>
+<div style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-tight); overflow: hidden;">
 <div class="table-responsive">
-<table class="table table-striped align-middle">
-  <thead><tr><th>Data</th><th>Ora</th><th>Nome</th><th>Persone</th><th>Stato</th><th></th></tr></thead>
+<table class="table align-middle mb-0">
+  <thead style="background-color: var(--color-bg);">
+    <tr style="border-bottom: 2px solid var(--color-border);">
+      <th class="py-3 ps-4">Data</th>
+      <th class="py-3">Ora</th>
+      <th class="py-3">Cliente</th>
+      <th class="py-3 text-center">Pers.</th>
+      <th class="py-3 text-center">Stato</th>
+      <th class="py-3 pe-4 text-end">Azioni</th>
+    </tr>
+  </thead>
   <tbody>
     {% for p in prossime %}
-    <tr>
-      <td>{{ p.data|date:"d/m/Y" }}</td>
-      <td>{{ p.ora|time:"H:i" }}</td>
-      <td>{{ p.nome }}</td>
-      <td>{{ p.numero_coperti }}</td>
-      <td>
+    <tr style="border-bottom: 1px solid var(--color-border);">
+      <td class="py-3 ps-4 fw-semibold">{{ p.data|date:"d/m/Y" }}</td>
+      <td class="py-3 fw-bold" style="color: var(--color-primary);">{{ p.ora|time:"H:i" }}</td>
+      <td class="py-3">
+        <div class="fw-semibold">{{ p.nome }}</div>
+        <div class="small" style="color: var(--color-muted);">{{ p.telefono }}</div>
+      </td>
+      <td class="py-3 text-center fw-bold">{{ p.numero_coperti }}</td>
+      <td class="py-3 text-center">
         {% if p.stato == "confermata" %}
           <span class="badge" style="background-color: var(--color-primary);">Confermata</span>
         {% else %}
-          <span class="badge" style="background-color: var(--color-accent);">In attesa</span>
+          <span class="badge" style="background-color: var(--color-accent);">Da confermare</span>
         {% endif %}
       </td>
-      <td class="text-nowrap">
+      <td class="py-3 pe-4">
+        <div class="d-flex gap-2 justify-content-end flex-wrap">
         {% if p.stato != "confermata" %}
         <form method="post" class="d-inline">
           {% csrf_token %}
@@ -106,13 +142,15 @@
           <input type="hidden" name="azione" value="annulla">
           <button type="submit" class="btn btn-sm btn-outline-danger">Annulla</button>
         </form>
+        </div>
       </td>
     </tr>
     {% empty %}
-    <tr><td colspan="6">Nessuna prenotazione in programma.</td></tr>
+    <tr><td colspan="6" class="py-4 text-center" style="color: var(--color-muted);">Nessuna prenotazione in programma.</td></tr>
     {% endfor %}
   </tbody>
 </table>
+</div>
 </div>
 {% endblock %}
 

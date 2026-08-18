@@ -39,6 +39,13 @@ def impostazioni_menu(request):
 
         impostazioni.ordini_qr_abilitati = request.POST.get("ordini_qr_abilitati") == "on"
 
+        try:
+            soglia = int(request.POST.get("soglia_ritardo_cucina_minuti", ""))
+            if 1 <= soglia <= 120:
+                impostazioni.soglia_ritardo_cucina_minuti = soglia
+        except (TypeError, ValueError):
+            pass
+
         impostazioni.save()
         if not errore_prezzo:
             return redirect("menu_digitale:impostazioni")
