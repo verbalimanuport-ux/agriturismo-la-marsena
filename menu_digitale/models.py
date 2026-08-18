@@ -10,6 +10,15 @@ class Categoria(models.Model):
 
     nome = models.CharField(max_length=100, verbose_name="Nome categoria")
     ordine = models.PositiveIntegerField(default=0, verbose_name="Ordine di visualizzazione")
+    richiede_cucina = models.BooleanField(
+        default=True,
+        verbose_name="Richiede cucina",
+        help_text=(
+            "Spegnilo per categorie come Vini/Bibite/Caffè: i piatti dentro non "
+            "passeranno mai dalla vista Cucina, ma da una sezione 'Da consegnare' "
+            "direttamente sulla pagina del tavolo."
+        ),
+    )
 
     class Meta:
         verbose_name = "Categoria"

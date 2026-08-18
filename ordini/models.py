@@ -82,6 +82,19 @@ class Ordine(models.Model):
         self.chiuso_il = timezone.now()
         self.save()
 
+    @property
+    def stato_servizio(self):
+        """Per la Sala/Mappa: 'completo' quando tutte le righe sono state
+        servite/consegnate e non c'è più nulla in sospeso (in attesa di essere
+        inviato, in cucina, pronto). Se non c'è ancora nessuna riga, resta
+        semplicemente 'aperto' (tavolo occupato, non ha ancora ordinato)."""
+        righe = list(self.righe.all())
+        if not righe:
+            return "aperto"
+        if any(r.stato != RigaOrdine.STATO_SERVITO for r in righe):
+            return "aperto"
+        return "completo"
+
 
 class RigaOrdine(models.Model):
     ORIGINE_CLIENTE = "cliente"
@@ -91,10 +104,12 @@ class RigaOrdine(models.Model):
         (ORIGINE_STAFF, "Staff"),
     ]
 
+    STATO_BOZZA = "bozza"
     STATO_IN_ATTESA = "in_attesa"
     STATO_PRONTO = "pronto"
     STATO_SERVITO = "servito"
     STATO_CHOICES = [
+        (STATO_BOZZA, "Da inviare"),
         (STATO_IN_ATTESA, "In cucina"),
         (STATO_PRONTO, "Pronto"),
         (STATO_SERVITO, "Servito"),
@@ -125,7 +140,7 @@ class RigaOrdine(models.Model):
     stato = models.CharField(
         max_length=20,
         choices=STATO_CHOICES,
-        default=STATO_IN_ATTESA,
+        default=STATO_BOZZA,
         verbose_name="Stato preparazione",
     )
     portata = models.PositiveIntegerField(

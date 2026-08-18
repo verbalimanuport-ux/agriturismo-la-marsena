@@ -148,6 +148,14 @@
     max-width: 1140px;
   }
 
+  .home-card {
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .home-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-soft);
+  }
+
   .staff-banner {
     background-color: var(--color-accent);
     color: #fff;
@@ -223,7 +231,7 @@
 <main class="container my-4">
 {% if messages %}
   {% for message in messages %}
-    <div class="alert alert-info">{{ message }}</div>
+    <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags %}{{ message.tags }}{% else %}info{% endif %}">{{ message }}</div>
   {% endfor %}
 {% endif %}
 {% block content %}{% endblock %}

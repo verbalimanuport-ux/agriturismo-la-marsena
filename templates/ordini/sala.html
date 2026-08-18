@@ -3,13 +3,15 @@
 {% block content %}
 <h1 class="mb-4">Sala — stato tavoli</h1>
 <div class="row">
-  {% for tavolo, ordine, pronti in tavoli_con_ordine %}
+  {% for tavolo, ordine, pronti, stato_servizio in tavoli_con_ordine %}
   <div class="col-6 col-md-3 mb-3">
     <a href="{% url 'ordini:gestisci_tavolo' tavolo.id %}" class="text-decoration-none">
       <div class="card {% if ordine %}border-success{% endif %} {% if pronti %}border-warning border-2{% endif %}">
         <div class="card-body text-center">
           <h5>Tavolo {{ tavolo.numero }}</h5>
-          {% if ordine %}
+          {% if stato_servizio == "completo" %}
+            <span class="badge d-block mb-1" style="background-color: var(--color-charcoal);">✅ Servizio completo</span>
+          {% elif ordine %}
             <span class="badge bg-success d-block mb-1">Aperto — &euro;{{ ordine.totale }}</span>
           {% else %}
             <span class="badge bg-secondary">Libero</span>

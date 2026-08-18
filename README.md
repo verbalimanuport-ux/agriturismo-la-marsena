@@ -500,7 +500,78 @@ Su Cucina, Sala e pagina del tavolo, un "ding" avvisa quando c'è una novità ri
 guardare lo schermo. Nota: alcuni browser richiedono un primo tocco/clic sulla pagina prima
 di poter riprodurre suoni — è una restrizione di sicurezza dei browser, non un difetto.
 
-## 38. Prossimo passo
+## 39. Blocco novità: conferma apertura, invia in cucina, extra separati, mappa migliorata
+
+Serve una nuova migrazione (due app coinvolte):
+
+```
+python manage.py migrate
+```
+
+### Conferma prima di aprire un tavolo
+Cliccando un tavolo **libero** (da Sala o Mappa), ora compare una pagina "Tavolo X è
+libero. Vuoi aprirlo?" con un pulsante — sfogliare la mappa non occupa più tavoli per
+sbaglio. Un tavolo già aperto continua ad aprirsi direttamente come prima.
+
+### Blocco assegnazione a tavolo occupato
+Dalla dashboard prenotazioni, se provi ad assegnare una prenotazione a un tavolo che ha
+già un conto aperto, ora te lo impedisce con un avviso invece di mescolare i due gruppi.
+
+### "Invia in cucina" — l'ordine non parte più da solo
+Ogni piatto aggiunto (sia dall'automatismo del menù fisso sia a mano) resta ora in una
+sezione **"📝 Da inviare"** sulla pagina del tavolo — modificabile con calma (note,
+quantità, giro). Solo quando premi il pulsante **"📤 Invia in cucina"** tutto parte
+davvero: i piatti delle categorie "cucina" vanno in Cucina, gli extra (vini/bibite/caffè)
+saltano direttamente in una sezione **"🔔 Da consegnare"**.
+
+### Categorie "Richiede cucina"
+Da `/admin/menu_digitale/categoria/` ogni categoria ha ora un interruttore **"Richiede
+cucina"** (acceso di default). Spegnetelo per Vini/Bibite/Caffè — i piatti dentro non
+passeranno mai dalla vista Cucina, restando comunque nel conto e visibili nella sezione
+"Da consegnare" del tavolo, con un pulsante "✅ Consegnato" per segnarli.
+
+### Nuovo stato "Servizio completo"
+Su Sala e Mappa, un tavolo con tutto già servito (ma conto non ancora chiuso) mostra ora
+un badge scuro **"✅ Servizio completo"**, distinto dal verde "Aperto" di un tavolo ancora
+in corso.
+
+### Pulsante Cucina ridisegnato
+"Pronto — tocca per segnare servito" ora ha uno stile diverso (arancione/rosso, non più
+verde con spunta), per essere chiaramente un pulsante da premere e non un'etichetta di
+qualcosa già fatto.
+
+### Mappa: dimensione tavoli e "muri magnetici"
+- I tavoli sulla mappa sono ora **dimensionati in base alla capienza** — un tavolo da 6
+  è visibilmente più grande di uno da 2
+- Disegnando il perimetro, trascinando un punto **si "aggancia" automaticamente** se ti
+  avvicini ad essere allineato in orizzontale/verticale col punto vicino — molto più
+  facile fare muri dritti
+
+### Messaggi di errore colorati
+Corretto un dettaglio: i messaggi di errore (es. "tavolo già occupato") ora appaiono in
+rosso, non più con lo stesso azzurro di un messaggio normale.
+
+### Testo home
+Tolto "Lezioni a cavallo e" dalla card MD Ranch — resta solo "Battesimo della sella per
+grandi e piccini" (le lezioni vere sono fuori dall'orario del servizio ristorante).
+
+## 41. Video di presentazione e card cliccabili in home
+
+Nessuna migrazione richiesta, ma questo zip è più pesante del solito (~15 MB in più) perché
+contiene i due video.
+
+- Le tre card della home (**Prodotti dell'azienda**, **Cucina genuina**, **MD Ranch**) sono
+  ora cliccabili, con un piccolo effetto di sollevamento al passaggio del mouse
+- **Prodotti dell'azienda** → apre una pagina dedicata con il video di presentazione
+  dell'azienda agricola e i pulsanti Instagram/Facebook
+- **MD Ranch** → stessa cosa, con il video del maneggio e i suoi social
+- **Cucina genuina** → per ora porta al menù pubblico (non c'è ancora un video dedicato
+  alla cucina — se un giorno lo girate, lo aggiungiamo con la stessa struttura)
+- I video sono in `static/video/` — per sostituirli con video veri in futuro, basta
+  rimpiazzare i due file mantenendo lo stesso nome (`azienda_agricola.mp4`,
+  `md_ranch.mp4`) e ricaricare
+
+## 42. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.

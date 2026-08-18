@@ -5,8 +5,8 @@ from .models import Categoria, ImpostazioniMenu, Piatto
 
 @admin.register(Categoria)
 class CategoriaAdmin(admin.ModelAdmin):
-    list_display = ("nome", "ordine")
-    list_editable = ("ordine",)
+    list_display = ("nome", "richiede_cucina", "ordine")
+    list_editable = ("richiede_cucina", "ordine")
 
 
 @admin.register(Piatto)

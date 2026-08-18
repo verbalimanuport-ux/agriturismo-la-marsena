@@ -23,7 +23,9 @@ def _genera_portate_standard_se_fisso(ordine, utente):
     sono più di uno, es. 2 antipasti) vengono serviti a tutti i coperti, non
     è una scelta tra opzioni. Non tocca mai una riga già esistente verso il
     basso (non cancella eccezioni già segnate dal cameriere) — al massimo la
-    alza, se sono aumentati i coperti."""
+    alza, se sono aumentati i coperti. Le righe partono come "Da inviare":
+    tocca al cameriere premere "Invia in cucina" quando ha finito di comporre
+    l'ordine (note, extra ecc.)."""
     impostazioni = ImpostazioniMenu.ottieni()
     if impostazioni.modalita_attiva != ImpostazioniMenu.MODALITA_FISSO:
         return
@@ -42,6 +44,7 @@ def _genera_portate_standard_se_fisso(ordine, utente):
                 portata=piatto.categoria.ordine or 1,
                 origine=RigaOrdine.ORIGINE_STAFF,
                 inviato_da=utente,
+                stato=RigaOrdine.STATO_BOZZA,
             )
         elif riga.quantita < ordine.numero_coperti:
             riga.quantita = ordine.numero_coperti
@@ -86,8 +89,9 @@ def ordina_tavolo(request, numero_tavolo):
                 note=form.cleaned_data["note"],
                 origine=RigaOrdine.ORIGINE_CLIENTE,
                 portata=piatto.categoria.ordine or 1,
+                stato=RigaOrdine.STATO_BOZZA,
             )
-            messages.success(request, "Ordine inviato!")
+            messages.success(request, "Richiesta ricevuta! Il cameriere la invierà a breve.")
             return redirect("ordini:ordina_tavolo", numero_tavolo=numero_tavolo)
     else:
         form = AggiungiPiattoForm(solo_extra=solo_extra)
@@ -107,8 +111,9 @@ def ordina_tavolo(request, numero_tavolo):
 
 @login_required
 def sala(request):
-    """Vista d'insieme per lo staff: quali tavoli hanno un conto aperto, e
-    quali hanno piatti pronti da ritirare (in attesa del cameriere)."""
+    """Vista d'insieme per lo staff: quali tavoli hanno un conto aperto,
+    quali hanno piatti pronti da ritirare, e quali hanno finito il servizio
+    (tutto servito, in attesa solo del conto)."""
     tavoli = Tavolo.objects.filter(attivo=True)
     ordini_aperti = {o.tavolo_id: o for o in Ordine.objects.filter(stato=Ordine.STATO_APERTO)}
 
@@ -127,7 +132,8 @@ def sala(request):
         ordine = ordini_aperti.get(t.id)
         pronti = pronti_per_ordine.get(ordine.id, 0) if ordine else 0
         totale_pronti += pronti
-        tavoli_con_ordine.append((t, ordine, pronti))
+        stato_servizio = ordine.stato_servizio if ordine else None
+        tavoli_con_ordine.append((t, ordine, pronti, stato_servizio))
 
     return render(
         request,
@@ -138,12 +144,23 @@ def sala(request):
 
 @login_required
 def gestisci_tavolo(request, tavolo_id):
-    """Vista per il cameriere: con menù fisso, imposta solo i coperti (le
-    portate standard si generano da sole) e gestisce eccezioni/extra; con la
-    carta, aggiunge i piatti scelti come sempre. Può sempre chiudere il conto
-    a fine servizio."""
+    """Vista per il cameriere. Se il tavolo è libero, chiede conferma prima
+    di aprirlo davvero (evita di 'occupare' un tavolo solo guardandolo dalla
+    mappa/Sala). Una volta aperto: con menù fisso, imposta i coperti (le
+    portate standard si generano da sole, come bozza); il cameriere compone
+    l'ordine con calma (note, extra) e preme "Invia in cucina" quando è
+    pronto — solo da lì in poi la cucina lo vede."""
     tavolo = get_object_or_404(Tavolo, id=tavolo_id)
-    ordine = Ordine.per_tavolo_aperto(tavolo)
+    ordine_esistente = Ordine.objects.filter(tavolo=tavolo, stato=Ordine.STATO_APERTO).first()
+
+    if request.method == "POST" and request.POST.get("azione") == "apri_tavolo":
+        Ordine.per_tavolo_aperto(tavolo)
+        return redirect("ordini:gestisci_tavolo", tavolo_id=tavolo.id)
+
+    if ordine_esistente is None:
+        return render(request, "ordini/conferma_apertura_tavolo.html", {"tavolo": tavolo})
+
+    ordine = ordine_esistente
     impostazioni = ImpostazioniMenu.ottieni()
 
     if request.method == "POST":
@@ -160,8 +177,9 @@ def gestisci_tavolo(request, tavolo_id):
                     origine=RigaOrdine.ORIGINE_STAFF,
                     inviato_da=request.user,
                     portata=piatto.categoria.ordine or 1,
+                    stato=RigaOrdine.STATO_BOZZA,
                 )
-                messages.success(request, f"Aggiunto: {piatto.nome}.")
+                messages.success(request, f"{piatto.nome} aggiunto — premi \"Invia in cucina\" quando hai finito.")
         elif azione == "rimuovi":
             riga_id = request.POST.get("riga_id")
             RigaOrdine.objects.filter(id=riga_id, ordine=ordine).delete()
@@ -182,12 +200,6 @@ def gestisci_tavolo(request, tavolo_id):
             nuova_nota = request.POST.get("note", "").strip()
             RigaOrdine.objects.filter(id=riga_id, ordine=ordine).update(note=nuova_nota)
             messages.success(request, "Nota salvata.")
-        elif azione == "giro_servito":
-            portata = request.POST.get("portata")
-            RigaOrdine.objects.filter(
-                ordine=ordine, portata=portata, stato=RigaOrdine.STATO_PRONTO
-            ).update(stato=RigaOrdine.STATO_SERVITO)
-            messages.success(request, f"Giro {portata} segnato come servito.")
         elif azione == "cambia_quantita":
             try:
                 riga_id = request.POST.get("riga_id")
@@ -198,11 +210,36 @@ def gestisci_tavolo(request, tavolo_id):
                     )
                     messages.success(request, "Quantità aggiornata.")
                 else:
-                    # quantità azzerata: la riga non ha più senso, la togliamo
                     RigaOrdine.objects.filter(id=riga_id, ordine=ordine).delete()
                     messages.success(request, "Piatto rimosso (quantità azzerata).")
             except (TypeError, ValueError):
                 pass
+        elif azione == "invia_cucina":
+            righe_da_inviare = list(
+                ordine.righe.filter(stato=RigaOrdine.STATO_BOZZA).select_related("piatto__categoria")
+            )
+            for riga in righe_da_inviare:
+                if riga.piatto.categoria.richiede_cucina:
+                    riga.stato = RigaOrdine.STATO_IN_ATTESA
+                else:
+                    riga.stato = RigaOrdine.STATO_PRONTO
+                riga.save()
+            if righe_da_inviare:
+                messages.success(request, "Ordine inviato!")
+            else:
+                messages.info(request, "Non c'era nulla da inviare.")
+        elif azione == "giro_servito":
+            portata = request.POST.get("portata")
+            RigaOrdine.objects.filter(
+                ordine=ordine, portata=portata, stato=RigaOrdine.STATO_PRONTO
+            ).update(stato=RigaOrdine.STATO_SERVITO)
+            messages.success(request, f"Giro {portata} segnato come servito.")
+        elif azione == "consegnato":
+            riga_id = request.POST.get("riga_id")
+            RigaOrdine.objects.filter(
+                id=riga_id, ordine=ordine, stato=RigaOrdine.STATO_PRONTO
+            ).update(stato=RigaOrdine.STATO_SERVITO)
+            messages.success(request, "Segnato come consegnato.")
         elif azione == "aggiorna_coperti":
             try:
                 nuovi_coperti = int(request.POST.get("numero_coperti", ordine.numero_coperti))
@@ -223,13 +260,21 @@ def gestisci_tavolo(request, tavolo_id):
         return redirect("ordini:gestisci_tavolo", tavolo_id=tavolo.id)
 
     form = AggiungiPiattoForm()
-    righe = list(
+    tutte_le_righe = list(
         ordine.righe.select_related("piatto__categoria", "inviato_da").order_by(
             "portata", "creata_il"
         )
     )
+
+    righe_bozza = [r for r in tutte_le_righe if r.stato == RigaOrdine.STATO_BOZZA]
+
+    righe_cucina = [
+        r
+        for r in tutte_le_righe
+        if r.stato != RigaOrdine.STATO_BOZZA and r.piatto.categoria.richiede_cucina
+    ]
     giri_map = {}
-    for riga in righe:
+    for riga in righe_cucina:
         giri_map.setdefault(riga.portata, []).append(riga)
 
     giri = []
@@ -246,6 +291,12 @@ def gestisci_tavolo(request, tavolo_id):
 
     giri_pronti = sum(1 for g in giri if g["stato_giro"] == "pronto")
 
+    da_consegnare = [
+        r
+        for r in tutte_le_righe
+        if r.stato == RigaOrdine.STATO_PRONTO and not r.piatto.categoria.richiede_cucina
+    ]
+
     return render(
         request,
         "ordini/gestisci_tavolo.html",
@@ -254,8 +305,10 @@ def gestisci_tavolo(request, tavolo_id):
             "ordine": ordine,
             "form": form,
             "impostazioni": impostazioni,
+            "righe_bozza": righe_bozza,
             "giri": giri,
             "giri_pronti": giri_pronti,
+            "da_consegnare": da_consegnare,
             "chiave_notifica_tavolo": f"tavolo_{tavolo.id}",
         },
     )
@@ -263,10 +316,12 @@ def gestisci_tavolo(request, tavolo_id):
 
 @login_required
 def cucina(request):
-    """Vista per la cucina: cosa preparare, raggruppato per tavolo e per giro.
-    Un solo pulsante 'Pronto' per l'intero giro (non per singolo piatto): una
-    volta segnato, il giro sparisce dalla vista cucina — da lì in poi tocca
-    al cameriere, che lo vede pronto sulla pagina del tavolo e lo consegna."""
+    """Vista per la cucina: cosa preparare, raggruppato per tavolo e per giro
+    (solo per le categorie che richiedono cucina: vini/bibite/caffè non
+    compaiono mai qui). Un solo pulsante 'Pronto' per l'intero giro (non per
+    singolo piatto): una volta segnato, il giro sparisce dalla vista cucina —
+    da lì in poi tocca al cameriere, che lo vede pronto sulla pagina del
+    tavolo e lo consegna."""
     if request.method == "POST":
         ordine_id = request.POST.get("ordine_id")
         portata = request.POST.get("portata")
@@ -277,7 +332,9 @@ def cucina(request):
 
     righe = (
         RigaOrdine.objects.filter(
-            ordine__stato=Ordine.STATO_APERTO, stato=RigaOrdine.STATO_IN_ATTESA
+            ordine__stato=Ordine.STATO_APERTO,
+            stato=RigaOrdine.STATO_IN_ATTESA,
+            piatto__categoria__richiede_cucina=True,
         )
         .select_related("ordine__tavolo", "piatto__categoria", "inviato_da")
         .order_by("ordine__aperto_il", "portata", "creata_il")
@@ -311,8 +368,10 @@ def stampa_qr(request):
 @login_required
 def mappa_tavoli(request):
     """Mappa visiva della sala: perimetro disegnato a punti dallo staff,
-    tavoli posizionabili trascinandoli. Cliccando su un tavolo (fuori dalla
-    modalità modifica) si va alla sua pagina di gestione, come dalla Sala."""
+    tavoli posizionabili trascinandoli (dimensione proporzionale alla
+    capienza). Cliccando su un tavolo (fuori dalla modalità modifica) si va
+    alla sua pagina di gestione, come dalla Sala — se libero, chiede conferma
+    prima di aprirlo davvero."""
     if request.method == "POST":
         try:
             dati = json.loads(request.body)
@@ -348,13 +407,16 @@ def mappa_tavoli(request):
             y = 20 + (i // colonne) * 25
         ordine = ordini_aperti.get(t.id)
         pronti = pronti_per_ordine.get(ordine.id, 0) if ordine else 0
+        stato_servizio = ordine.stato_servizio if ordine else None
         tavoli_dati.append(
             {
                 "id": t.id,
                 "numero": t.numero,
+                "capienza": t.capienza,
                 "x": x,
                 "y": y,
                 "aperto": bool(ordine),
+                "completo": stato_servizio == "completo",
                 "totale": float(ordine.totale) if ordine else 0,
                 "pronti": pronti,
             }

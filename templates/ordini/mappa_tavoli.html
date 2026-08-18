@@ -6,15 +6,18 @@
   <button id="btnModifica" type="button" class="btn btn-outline-success">Modifica disposizione</button>
 </div>
 <p class="text-muted mb-3">
-  Clicca su un tavolo per aprirne la gestione. Colori: <span style="color:#9c9c94;">■</span> libero,
+  Clicca su un tavolo per aprirne la gestione (i tavoli grandi hanno un riquadro più grande,
+  in base ai posti). Colori: <span style="color:#9c9c94;">■</span> libero,
   <span style="color: var(--color-primary);">■</span> aperto,
+  <span style="color: var(--color-charcoal);">■</span> servizio completo,
   <span style="color: var(--color-accent);">■</span> ha piatti pronti da ritirare (il numero sul badge).
 </p>
 
 <div id="pannelloModifica" class="alert alert-info" style="display:none;">
   <strong>Modalità modifica attiva.</strong> Trascina i tavoli per posizionarli. Clicca su un punto
   vuoto della mappa per aggiungere un angolo del perimetro della sala; trascina i punti rossi per
-  aggiustarli.
+  aggiustarli — si "agganciano" da soli se ti avvicini ad essere dritto in orizzontale/verticale
+  col punto vicino, per fare muri dritti facilmente.
   <div class="mt-2 d-flex gap-2 flex-wrap">
     <button id="btnCancellaPerimetro" type="button" class="btn btn-sm btn-outline-danger">Cancella perimetro</button>
     <button id="btnSalva" type="button" class="btn btn-sm btn-success">💾 Salva disposizione</button>
@@ -36,13 +39,20 @@
   var tavoli = JSON.parse(document.getElementById('datiTavoli').textContent);
   var perimetro = JSON.parse(document.getElementById('datiPerimetro').textContent);
   var editMode = false;
+  var SOGLIA_MAGNETE = 2.2; // percento: quanto vicino deve essere per "agganciarsi"
 
   var container = document.getElementById('mappaContainer');
   var poligono = document.getElementById('poligonoPerimetro');
   var btnModifica = document.getElementById('btnModifica');
   var pannelloModifica = document.getElementById('pannelloModifica');
 
-  function abilitaTrascinamento(elemento, onMove) {
+  function dimensioneTavolo(capienza) {
+    // dimensione proporzionale ai posti: cresce circa 6px ogni 2 posti in più
+    var lato = 34 + (capienza || 2) * 6;
+    return Math.max(40, Math.min(96, lato));
+  }
+
+  function abilitaTrascinamento(elemento, onMove, trasforma) {
     elemento.addEventListener('pointerdown', function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
@@ -54,6 +64,11 @@
         var y = ((ev2.clientY - rect.top) / rect.height) * 100;
         x = Math.max(0, Math.min(100, x));
         y = Math.max(0, Math.min(100, y));
+        if (trasforma) {
+          var risultato = trasforma(x, y);
+          x = risultato.x;
+          y = risultato.y;
+        }
         elemento.style.left = x + '%';
         elemento.style.top = y + '%';
         onMove(x, y);
@@ -67,6 +82,21 @@
     });
   }
 
+  function magnetizzaPunto(indice, x, y) {
+    // Se ci si avvicina ad essere allineati in orizzontale o verticale con
+    // uno dei due punti vicini (il precedente o il successivo nel poligono),
+    // "scatta" a essere perfettamente dritto — aiuta a fare muri dritti.
+    var n = perimetro.length;
+    if (n < 2) return { x: x, y: y };
+    var vicini = [perimetro[(indice - 1 + n) % n], perimetro[(indice + 1) % n]];
+    vicini.forEach(function (v) {
+      if (!v) return;
+      if (Math.abs(v.x - x) < SOGLIA_MAGNETE) x = v.x;
+      if (Math.abs(v.y - y) < SOGLIA_MAGNETE) y = v.y;
+    });
+    return { x: x, y: y };
+  }
+
   function renderPerimetro() {
     poligono.setAttribute('points', perimetro.map(function (p) { return p.x + ',' + p.y; }).join(' '));
     var vecchi = container.querySelectorAll('.handle-perimetro');
@@ -76,7 +106,11 @@
         var h = document.createElement('div');
         h.className = 'handle-perimetro';
         h.style.cssText = 'position:absolute; left:' + p.x + '%; top:' + p.y + '%; width:16px; height:16px; margin:-8px; border-radius:50%; background:#A3452C; border:2px solid #fff; cursor:grab; z-index:6;';
-        abilitaTrascinamento(h, function (x, y) { perimetro[indice] = { x: x, y: y }; renderPerimetro(); });
+        abilitaTrascinamento(
+          h,
+          function (x, y) { perimetro[indice] = { x: x, y: y }; renderPerimetro(); },
+          function (x, y) { return magnetizzaPunto(indice, x, y); }
+        );
         container.appendChild(h);
       });
     }
@@ -90,8 +124,10 @@
       el.className = 'marker-tavolo';
       var colore = '#9c9c94';
       if (t.aperto) colore = '#46592F';
+      if (t.completo) colore = '#26282D';
       if (t.pronti > 0) colore = '#A3452C';
-      el.style.cssText = 'position:absolute; left:' + t.x + '%; top:' + t.y + '%; width:58px; height:58px; margin:-29px; border-radius:12px; background:' + colore + '; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.25); z-index:10; font-family:Fraunces,serif; font-size:1.1rem;';
+      var lato = dimensioneTavolo(t.capienza);
+      el.style.cssText = 'position:absolute; left:' + t.x + '%; top:' + t.y + '%; width:' + lato + 'px; height:' + lato + 'px; margin:-' + (lato / 2) + 'px; border-radius:12px; background:' + colore + '; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.25); z-index:10; font-family:Fraunces,serif; font-size:1.1rem;';
       el.textContent = t.numero;
       if (t.pronti > 0) {
         var badge = document.createElement('span');

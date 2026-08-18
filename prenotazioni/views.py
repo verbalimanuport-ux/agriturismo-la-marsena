@@ -101,6 +101,14 @@ def dashboard(request):
 
             tavolo_id = request.POST.get("tavolo_id")
             tavolo = get_object_or_404(Tavolo, id=tavolo_id, attivo=True)
+            gia_occupato = Ordine.objects.filter(tavolo=tavolo, stato=Ordine.STATO_APERTO).exists()
+            if gia_occupato:
+                messages.error(
+                    request,
+                    f"Il tavolo {tavolo.numero} è già occupato: scegline un altro o chiudi "
+                    "prima il suo conto.",
+                )
+                return redirect("prenotazioni:dashboard")
             ordine = Ordine.per_tavolo_aperto(tavolo)
             ordine.numero_coperti = pren.numero_coperti
             ordine.prenotazione = pren

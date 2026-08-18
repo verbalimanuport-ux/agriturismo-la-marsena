@@ -32,25 +32,31 @@
 
 <div class="row g-4 mt-1">
   <div class="col-md-4">
-    <div class="p-4 h-100 text-center" style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
-      <p class="fs-3 mb-2">🌿</p>
-      <h3 class="h5">Prodotti dell'azienda</h3>
-      <p class="small mb-0" style="color: var(--color-muted);">Ortaggi, frutta, miele e formaggi a km0, direttamente dalla nostra terra.</p>
-    </div>
+    <a href="{% url 'azienda_agricola' %}" class="text-decoration-none d-block h-100">
+      <div class="home-card p-4 h-100 text-center" style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
+        <p class="fs-3 mb-2">🌿</p>
+        <h3 class="h5" style="color: var(--color-text);">Prodotti dell'azienda</h3>
+        <p class="small mb-0" style="color: var(--color-muted);">Ortaggi, frutta, miele e formaggi a km0, direttamente dalla nostra terra.</p>
+      </div>
+    </a>
   </div>
   <div class="col-md-4">
-    <div class="p-4 h-100 text-center" style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
-      <p class="fs-3 mb-2">🍽️</p>
-      <h3 class="h5">Cucina genuina</h3>
-      <p class="small mb-0" style="color: var(--color-muted);">Piatti della tradizione, preparati con quello che coltiviamo e alleviamo.</p>
-    </div>
+    <a href="{% url 'menu_digitale:menu' %}" class="text-decoration-none d-block h-100">
+      <div class="home-card p-4 h-100 text-center" style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
+        <p class="fs-3 mb-2">🍽️</p>
+        <h3 class="h5" style="color: var(--color-text);">Cucina genuina</h3>
+        <p class="small mb-0" style="color: var(--color-muted);">Piatti della tradizione, preparati con quello che coltiviamo e alleviamo.</p>
+      </div>
+    </a>
   </div>
   <div class="col-md-4">
-    <div class="p-4 h-100 text-center" style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
-      <p class="fs-3 mb-2">🐴</p>
-      <h3 class="h5">MD Ranch</h3>
-      <p class="small mb-0" style="color: var(--color-muted);">Lezioni a cavallo e "battesimo della sella" per grandi e piccini.</p>
-    </div>
+    <a href="{% url 'md_ranch' %}" class="text-decoration-none d-block h-100">
+      <div class="home-card p-4 h-100 text-center" style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
+        <p class="fs-3 mb-2">🐴</p>
+        <h3 class="h5" style="color: var(--color-text);">MD Ranch</h3>
+        <p class="small mb-0" style="color: var(--color-muted);">"Battesimo della sella" per grandi e piccini.</p>
+      </div>
+    </a>
   </div>
 </div>
 {% endblock %}

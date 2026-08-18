@@ -9,6 +9,8 @@ from core import views as core_views
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", core_views.home, name="home"),
+    path("azienda-agricola/", core_views.azienda_agricola, name="azienda_agricola"),
+    path("md-ranch/", core_views.md_ranch, name="md_ranch"),
     path("menu/", include("menu_digitale.urls")),
     path("ordini/", include("ordini.urls")),
     path("", include("prenotazioni.urls")),
