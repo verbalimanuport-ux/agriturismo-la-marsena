@@ -12,7 +12,7 @@
         {% elif dato.stato_sala == 'in_cucina' %}var(--color-in-cucina){% elif dato.stato_sala == 'in_attesa_ordini' %}var(--color-in-attesa-ordini)
         {% else %}var(--color-libero){% endif %};">
         {{ dato.tavolo.numero }}
-        {% if dato.giro %}<div class="small fw-normal">G{{ dato.giro.numero }}</div>{% endif %}
+        {% if dato.giro %}<div class="small fw-normal">G{{ dato.giro.numero }}{% if dato.giro.step %}.{{ dato.giro.step }}{% endif %}</div>{% endif %}
       </div>
     {% endfor %}
   </div>
@@ -25,7 +25,7 @@
   </p>
 </div>
 
-<p class="text-muted mb-4">Un solo pulsante per l'intero giro: appena è tutto pronto, segnalo e sparisce da qui — ci pensa il cameriere da lì in poi.</p>
+<p class="text-muted mb-4">Un solo pulsante per l'intero giro (o sotto-passo): appena è tutto pronto, segnalo e sparisce da qui — ci pensa il cameriere da lì in poi.</p>
 
 {% for tavolo, righe in tavoli_raggruppati %}
   <div class="card mb-4">
@@ -33,50 +33,60 @@
       <strong>Tavolo {{ tavolo.numero }}</strong>
     </div>
     <div class="card-body">
-      {% regroup righe by portata as giri %}
-      {% for giro in giri %}
-        {% with primo_stato=giro.list.0.stato %}
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <span class="badge" style="background-color: var(--color-accent);">Giro {{ giro.grouper }}</span>
-          {% if primo_stato == "in_attesa" %}
-            <form method="post">
-              {% csrf_token %}
-              <input type="hidden" name="ordine_id" value="{{ giro.list.0.ordine_id }}">
-              <input type="hidden" name="portata" value="{{ giro.grouper }}">
-              <button type="submit" class="btn btn-success">Pronto — tutto il giro</button>
-            </form>
-          {% else %}
-            <span class="badge" style="background-color: var(--color-muted);">⏳ In attesa del via libera dal cameriere</span>
-          {% endif %}
-        </div>
-        <div class="row mb-3">
-          {% for riga in giro.list %}
-          <div class="col-md-4 mb-3">
-            <div class="card h-100 {% if riga.in_ritardo %}border-danger border-2{% endif %} {% if primo_stato == 'previsto' %}opacity-75{% endif %}" style="{% if primo_stato == 'previsto' %}background-color: var(--color-bg);{% endif %}">
-              <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start">
-                  <h5 class="card-title mb-1">{{ riga.quantita }}x {{ riga.piatto.nome }}</h5>
-                  {% if riga.minuti_attesa is not None %}
-                    <span class="badge {% if riga.in_ritardo %}bg-danger{% else %}bg-secondary{% endif %} flex-shrink-0">
-                      {{ riga.minuti_attesa }} min
-                    </span>
+      {% regroup righe by portata as giri_principali %}
+      {% for giro_principale in giri_principali %}
+        {% regroup giro_principale.list by step as sotto_passi %}
+        {% with mostra_step=sotto_passi|length|default:0 %}
+        {% for sotto in sotto_passi %}
+          {% with primo_stato=sotto.list.0.stato %}
+          <div class="d-flex justify-content-between align-items-center mb-2 p-2"
+               style="border-radius:8px; {% if primo_stato == 'in_attesa' %}background-color: rgba(47,168,79,0.10); border: 2px solid var(--color-verde-acceso);{% endif %}">
+            <span class="badge" style="background-color: var(--color-accent);">
+              Giro {{ giro_principale.grouper }}{% if mostra_step > 1 %}.{{ sotto.grouper }}{% endif %}
+            </span>
+            {% if primo_stato == "in_attesa" %}
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="ordine_id" value="{{ sotto.list.0.ordine_id }}">
+                <input type="hidden" name="portata" value="{{ giro_principale.grouper }}">
+                <input type="hidden" name="step" value="{{ sotto.grouper }}">
+                <button type="submit" class="btn" style="background-color: var(--color-verde-acceso); color:#fff; font-weight:700;">✅ Pronto — tutto il giro</button>
+              </form>
+            {% else %}
+              <span class="badge" style="background-color: var(--color-muted);">⏳ In attesa del via libera dal cameriere</span>
+            {% endif %}
+          </div>
+          <div class="row mb-3">
+            {% for riga in sotto.list %}
+            <div class="col-md-4 mb-3">
+              <div class="card h-100 {% if riga.in_ritardo %}border-danger border-2{% endif %}"
+                   style="{% if primo_stato == 'previsto' %}opacity:0.5; background-color:#D8D6D0; filter:grayscale(40%);{% endif %}">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <h5 class="card-title mb-1">{{ riga.quantita }}x {{ riga.piatto.nome }}</h5>
+                    {% if riga.minuti_attesa is not None %}
+                      <span class="badge {% if riga.in_ritardo %}bg-danger{% else %}bg-secondary{% endif %} flex-shrink-0">
+                        {{ riga.minuti_attesa }} min
+                      </span>
+                    {% endif %}
+                  </div>
+                  <p class="mb-1 text-muted small">{{ riga.piatto.categoria.nome }}</p>
+                  <p class="mb-1 text-muted small">
+                    Cameriere: {{ riga.inviato_da.username|default:riga.get_origine_display }}
+                  </p>
+                  {% if riga.note %}
+                    <div class="mt-2 p-2 d-flex align-items-start gap-2" style="background-color: #FFF4CC; border-left: 4px solid #E0A800; border-radius: 6px;">
+                      <span style="font-size: 1.1rem; line-height:1;">⚠️</span>
+                      <span class="fw-semibold" style="color: #6B4E00; font-size: 0.95rem;">{{ riga.note }}</span>
+                    </div>
                   {% endif %}
                 </div>
-                <p class="mb-1 text-muted small">{{ riga.piatto.categoria.nome }}</p>
-                <p class="mb-1 text-muted small">
-                  Cameriere: {{ riga.inviato_da.username|default:riga.get_origine_display }}
-                </p>
-                {% if riga.note %}
-                  <div class="mt-2 p-2 d-flex align-items-start gap-2" style="background-color: #FFF4CC; border-left: 4px solid #E0A800; border-radius: 6px;">
-                    <span style="font-size: 1.1rem; line-height:1;">⚠️</span>
-                    <span class="fw-semibold" style="color: #6B4E00; font-size: 0.95rem;">{{ riga.note }}</span>
-                  </div>
-                {% endif %}
               </div>
             </div>
+            {% endfor %}
           </div>
-          {% endfor %}
-        </div>
+          {% endwith %}
+        {% endfor %}
         {% endwith %}
       {% endfor %}
     </div>

@@ -677,7 +677,37 @@ a **"Completata"** — resta visibile nell'elenco di oggi (utile per il riepilog
 serata) ma chiaramente distinta, senza più pulsanti d'azione. Se il conto viene riaperto
 per errore, torna "Arrivata" in automatico.
 
-## 48. Prossimo passo
+## 49. Struttura a due livelli: Giro + Step (menù degustazione)
+
+Nuova migrazione:
+
+```
+python manage.py migrate
+```
+
+Per i menù degustazione, dove lo stesso giro può avere più portate in sequenza per la
+stessa persona (es. due secondi diversi), ogni piatto ha ora — oltre al **Giro** — anche
+uno **Step** (sotto-passo), modificabile nella sezione "Da inviare" della pagina tavolo
+esattamente come il giro.
+
+**Come funziona in pratica:**
+- Lasciando Step = 1 su tutto (il caso normale, quasi sempre), **non cambia nulla**: si
+  vede "Giro 2" come sempre
+- Se invece due piatti dello stesso Giro hanno Step diversi (es. Step 1 e Step 2), il
+  sistema li tratta come **due sotto-passi indipendenti**, ciascuno con il proprio via
+  libera e il proprio "Pronto" — e li mostra ovunque come **"Giro 2.1"**, **"Giro 2.2"**
+  (in Sala, Mappa, Cucina, pagina tavolo) invece del semplice "Giro 2"
+
+**Cucina**: ogni sotto-passo ancora "Previsto" (non chiamato) è mostrato con **opacità
+ridotta al 50% e sfondo desaturato**, senza pulsante — visivamente "congelato". Appena il
+cameriere dà il via libera, il sotto-passo si accende con un **bordo verde acceso** e
+compare il pulsante "Pronto".
+
+**Suono corretto**: prima scattava solo quando arrivava un ordine nuovo — ora scatta
+anche (anzi, soprattutto) quando il cameriere dà il via libera a un giro, il momento in
+cui la cucina deve davvero accorgersene.
+
+## 50. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.

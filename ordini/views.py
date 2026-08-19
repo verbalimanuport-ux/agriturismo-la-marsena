@@ -196,6 +196,13 @@ def gestisci_tavolo(request, tavolo_id):
                         RigaOrdine.objects.filter(id=riga_id, ordine=ordine).update(portata=valore)
                 except (TypeError, ValueError):
                     pass
+            elif azione == "cambia_step":
+                try:
+                    valore = int(request.POST.get("step"))
+                    if valore > 0:
+                        RigaOrdine.objects.filter(id=riga_id, ordine=ordine).update(step=valore)
+                except (TypeError, ValueError):
+                    pass
             elif azione == "cambia_quantita":
                 try:
                     valore = int(request.POST.get("quantita"))
@@ -235,6 +242,15 @@ def gestisci_tavolo(request, tavolo_id):
                         portata=nuova_portata
                     )
                     messages.success(request, f"Spostato al giro {nuova_portata}.")
+            except (TypeError, ValueError):
+                pass
+        elif azione == "cambia_step":
+            try:
+                riga_id = request.POST.get("riga_id")
+                nuovo_step = int(request.POST.get("step"))
+                if nuovo_step > 0:
+                    RigaOrdine.objects.filter(id=riga_id, ordine=ordine).update(step=nuovo_step)
+                    messages.success(request, f"Spostato allo step {nuovo_step}.")
             except (TypeError, ValueError):
                 pass
         elif azione == "cambia_note":
@@ -295,18 +311,22 @@ def gestisci_tavolo(request, tavolo_id):
                 messages.info(request, "Non c'era nulla da inviare.")
         elif azione == "via_libera_giro":
             portata = request.POST.get("portata")
+            step = request.POST.get("step") or "1"
             adesso = timezone.now()
             aggiornate = RigaOrdine.objects.filter(
-                ordine=ordine, portata=portata, stato=RigaOrdine.STATO_PREVISTO
+                ordine=ordine, portata=portata, step=step, stato=RigaOrdine.STATO_PREVISTO
             ).update(stato=RigaOrdine.STATO_IN_ATTESA, inviata_il=adesso)
+            etichetta = portata if step == "1" else f"{portata}.{step}"
             if aggiornate:
-                messages.success(request, f"Via libera dato al giro {portata}: ora è in cucina.")
+                messages.success(request, f"Via libera dato al giro {etichetta}: ora è in cucina.")
         elif azione == "giro_servito":
             portata = request.POST.get("portata")
+            step = request.POST.get("step") or "1"
+            etichetta = portata if step == "1" else f"{portata}.{step}"
             RigaOrdine.objects.filter(
-                ordine=ordine, portata=portata, stato=RigaOrdine.STATO_PRONTO
+                ordine=ordine, portata=portata, step=step, stato=RigaOrdine.STATO_PRONTO
             ).update(stato=RigaOrdine.STATO_SERVITO)
-            messages.success(request, f"Giro {portata} segnato come servito.")
+            messages.success(request, f"Giro {etichetta} segnato come servito.")
         elif azione == "storna":
             riga_id = request.POST.get("riga_id")
             riga = RigaOrdine.objects.filter(id=riga_id, ordine=ordine).select_related("piatto").first()
@@ -359,7 +379,7 @@ def gestisci_tavolo(request, tavolo_id):
     form = AggiungiPiattoForm()
     tutte_le_righe = list(
         ordine.righe.select_related("piatto__categoria", "inviato_da").order_by(
-            "portata", "creata_il"
+            "portata", "step", "creata_il"
         )
     )
 
@@ -372,11 +392,17 @@ def gestisci_tavolo(request, tavolo_id):
     ]
     giri_map = {}
     for riga in righe_cucina:
-        giri_map.setdefault(riga.portata, []).append(riga)
+        giri_map.setdefault((riga.portata, riga.step), []).append(riga)
+
+    # Per ogni numero di giro, quanti step diversi sono in corso: se solo uno,
+    # mostriamo "Giro 2" semplice; se più di uno, "Giro 2.1", "Giro 2.2"...
+    step_per_giro = {}
+    for (numero, step) in giri_map.keys():
+        step_per_giro.setdefault(numero, set()).add(step)
 
     giri = []
-    for numero in sorted(giri_map.keys()):
-        righe_giro = giri_map[numero]
+    for (numero, step) in sorted(giri_map.keys()):
+        righe_giro = giri_map[(numero, step)]
         stati = {r.stato for r in righe_giro}
         if RigaOrdine.STATO_PREVISTO in stati:
             stato_giro = "previsto"
@@ -386,7 +412,16 @@ def gestisci_tavolo(request, tavolo_id):
             stato_giro = "pronto"
         else:
             stato_giro = "servito"
-        giri.append({"numero": numero, "stato_giro": stato_giro, "righe": righe_giro})
+        mostra_step = len(step_per_giro[numero]) > 1
+        giri.append(
+            {
+                "numero": numero,
+                "step": step,
+                "mostra_step": mostra_step,
+                "stato_giro": stato_giro,
+                "righe": righe_giro,
+            }
+        )
 
     giri_pronti = sum(1 for g in giri if g["stato_giro"] == "pronto")
 
@@ -430,8 +465,9 @@ def cucina(request):
     if request.method == "POST":
         ordine_id = request.POST.get("ordine_id")
         portata = request.POST.get("portata")
+        step = request.POST.get("step") or "1"
         RigaOrdine.objects.filter(
-            ordine_id=ordine_id, portata=portata, stato=RigaOrdine.STATO_IN_ATTESA
+            ordine_id=ordine_id, portata=portata, step=step, stato=RigaOrdine.STATO_IN_ATTESA
         ).update(stato=RigaOrdine.STATO_PRONTO)
         return redirect("ordini:cucina")
 
@@ -442,12 +478,13 @@ def cucina(request):
             piatto__categoria__richiede_cucina=True,
         )
         .select_related("ordine__tavolo", "piatto__categoria", "inviato_da")
-        .order_by("ordine__aperto_il", "portata", "creata_il")
+        .order_by("ordine__aperto_il", "portata", "step", "creata_il")
     )
 
     adesso = timezone.now()
     soglia = ImpostazioniMenu.ottieni().soglia_ritardo_cucina_minuti or SOGLIA_ATTESA_MINUTI
     tavoli_raggruppati = {}
+    conteggio_attivi = 0
     for riga in righe:
         if riga.stato == RigaOrdine.STATO_IN_ATTESA:
             # Il tempo di attesa parte da quando è arrivato il via libera, non
@@ -455,6 +492,7 @@ def cucina(request):
             riferimento = riga.inviata_il or riga.creata_il
             riga.minuti_attesa = int((adesso - riferimento).total_seconds() // 60)
             riga.in_ritardo = riga.minuti_attesa >= soglia
+            conteggio_attivi += 1
         else:
             riga.minuti_attesa = None
             riga.in_ritardo = False
@@ -466,7 +504,10 @@ def cucina(request):
         "ordini/cucina.html",
         {
             "tavoli_raggruppati": tavoli_raggruppati.items(),
-            "totale_in_attesa": len(righe),
+            # Conta solo i giri già "chiamati" (In cucina), non quelli ancora
+            # Previsti: così il suono scatta quando il cameriere dà il via
+            # libera, non solo quando arriva un nuovo ordine.
+            "totale_in_attesa": conteggio_attivi,
             "riepilogo_sala": _riepilogo_tavoli(),
         },
     )

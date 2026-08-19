@@ -69,7 +69,7 @@
     </div>
     <div class="table-responsive mb-0">
       <table class="table align-middle mb-0">
-        <thead><tr><th>Qtà</th><th>Piatto</th><th>Giro</th><th>Note per la cucina</th><th></th></tr></thead>
+        <thead><tr><th>Qtà</th><th>Piatto</th><th>Giro</th><th>Step</th><th>Note per la cucina</th><th></th></tr></thead>
         <tbody>
           {% for riga in righe_bozza %}
           <tr>
@@ -81,7 +81,16 @@
             <td>
               {% if riga.piatto.categoria.richiede_cucina %}
                 <input type="number" name="portata_riga_{{ riga.id }}" min="1" value="{{ riga.portata }}"
-                       class="form-control form-control-sm campo-auto" data-riga="{{ riga.id }}" data-campo="portata" style="width:70px;">
+                       class="form-control form-control-sm campo-auto" data-riga="{{ riga.id }}" data-campo="portata" style="width:60px;">
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if riga.piatto.categoria.richiede_cucina %}
+                <input type="number" name="step_riga_{{ riga.id }}" min="1" value="{{ riga.step }}"
+                       class="form-control form-control-sm campo-auto" data-riga="{{ riga.id }}" data-campo="step" style="width:60px;"
+                       title="Sotto-passo: lascia 1 salvo per menù degustazione con più portate in sequenza nello stesso giro">
               {% else %}
                 <span class="text-muted">—</span>
               {% endif %}
@@ -148,23 +157,27 @@
 
 {% for giro in giri %}
   <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
-    <span class="badge" style="background-color: var(--color-accent);">Giro {{ giro.numero }}</span>
+    <span class="badge" style="background-color: var(--color-accent);">
+      Giro {{ giro.numero }}{% if giro.mostra_step %}.{{ giro.step }}{% endif %}
+    </span>
     {% if giro.stato_giro == "previsto" %}
       <form method="post">
         {% csrf_token %}
         <input type="hidden" name="azione" value="via_libera_giro">
         <input type="hidden" name="portata" value="{{ giro.numero }}">
+        <input type="hidden" name="step" value="{{ giro.step }}">
         <button type="submit" class="btn btn-lg" style="background-color: var(--color-in-cucina); color:#fff; font-weight:600;">
           🟢 Via libera cucina
         </button>
       </form>
     {% elif giro.stato_giro == "in_cucina" %}
-      <span class="badge" style="background-color: var(--color-in-cucina);">👨‍🍳 In cucina</span>
+      <span class="badge" style="background-color: var(--color-verde-acceso);">👨‍🍳 In cucina</span>
     {% elif giro.stato_giro == "pronto" %}
       <form method="post">
         {% csrf_token %}
         <input type="hidden" name="azione" value="giro_servito">
         <input type="hidden" name="portata" value="{{ giro.numero }}">
+        <input type="hidden" name="step" value="{{ giro.step }}">
         <button type="submit" class="btn btn-lg" style="background-color: var(--color-accent); color:#fff; font-weight:600;">
           🔔 Pronto — tocca per segnare servito
         </button>
@@ -177,7 +190,7 @@
     <p class="text-muted small mb-2">La cucina vede già questo giro per organizzarsi, ma parte solo quando dai il via libera.</p>
   {% endif %}
 
-  <div class="table-responsive mb-2">
+  <div class="table-responsive mb-2" style="{% if giro.stato_giro == 'previsto' %}opacity:0.6;{% endif %}">
   <table class="table align-middle">
     <thead><tr><th>Qtà</th><th>Piatto</th><th>Note</th><th>Da</th><th>Prezzo</th><th></th></tr></thead>
     <tbody>
@@ -241,7 +254,7 @@
       campo.dataset.valorePrecedente = campo.value;
 
       var tipo = campo.dataset.campo;
-      var azione = tipo === 'note' ? 'cambia_note' : (tipo === 'portata' ? 'cambia_portata' : 'cambia_quantita');
+      var azione = tipo === 'note' ? 'cambia_note' : (tipo === 'portata' ? 'cambia_portata' : (tipo === 'step' ? 'cambia_step' : 'cambia_quantita'));
 
       var dati = new FormData();
       dati.append('csrfmiddlewaretoken', token);

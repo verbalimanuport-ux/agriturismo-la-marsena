@@ -164,15 +164,18 @@ class Ordine(models.Model):
 
     @property
     def giro_in_evidenza(self):
-        """Il giro (tra quelli di cucina) più urgente da mostrare accanto al
-        colore del tavolo: il numero più basso non ancora completamente
-        servito. None se non c'è nulla in sospeso lato cucina."""
+        """Il giro/step (tra quelli di cucina) più urgente da mostrare accanto
+        al colore del tavolo: la coppia (giro, step) più bassa non ancora
+        completamente servita. Il numero di step viene mostrato solo se quel
+        giro ha davvero più di un sotto-passo in corso — altrimenti resta
+        "G2" invece di "G2.1", per non appesantire il caso normale.
+        None se non c'è nulla in sospeso lato cucina."""
         righe_cucina = [r for r in self.righe.all() if r.piatto.categoria.richiede_cucina]
         non_serviti = [r for r in righe_cucina if r.stato != RigaOrdine.STATO_SERVITO]
         if not non_serviti:
             return None
-        numero = min(r.portata for r in non_serviti)
-        stati_giro = {r.stato for r in non_serviti if r.portata == numero}
+        chiave = min((r.portata, r.step) for r in non_serviti)
+        stati_giro = {r.stato for r in non_serviti if (r.portata, r.step) == chiave}
         if RigaOrdine.STATO_BOZZA in stati_giro:
             stato = "bozza"
         elif RigaOrdine.STATO_PREVISTO in stati_giro:
@@ -181,7 +184,12 @@ class Ordine(models.Model):
             stato = "in_cucina"
         else:
             stato = "pronto"
-        return {"numero": numero, "stato": stato}
+        step_diversi = {r.step for r in non_serviti if r.portata == chiave[0]}
+        return {
+            "numero": chiave[0],
+            "step": chiave[1] if len(step_diversi) > 1 else None,
+            "stato": stato,
+        }
 
 
 class RigaOrdine(models.Model):
@@ -240,6 +248,17 @@ class RigaOrdine(models.Model):
             "Piatti con lo stesso numero escono insieme dalla cucina. Calcolato "
             "automaticamente dall'ordine della categoria, ma modificabile a mano "
             "(es. un secondo che deve uscire insieme agli antipasti)."
+        ),
+    )
+    step = models.PositiveIntegerField(
+        default=1,
+        verbose_name="Sotto-passo del giro",
+        help_text=(
+            "Per menù degustazione: quando lo stesso giro ha più portate in "
+            "sequenza per la stessa persona (es. due secondi diversi), usa "
+            "step differenti (1, 2, 3...) per chiamarli in cucina uno alla "
+            "volta. Lascia 1 per i giri normali, senza sequenza — il caso di "
+            "quasi tutti i piatti."
         ),
     )
     note = models.CharField(max_length=200, blank=True, verbose_name="Note")
