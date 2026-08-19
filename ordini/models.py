@@ -157,12 +157,15 @@ class Ordine(models.Model):
             totale_piatti = sum((r.subtotale for r in righe), start=0)
         else:
             # Modalità "Solo menù fisso": i piatti fissi entrano nel calcolo a
-            # persona, tutto il resto (carta/sempre visibile) a prezzo singolo.
+            # persona, tutto il resto (sempre a parte, o segnato "extra a
+            # pagamento" — es. una seconda Panna Cotta) a prezzo singolo.
             totale_a_prezzo_singolo = sum(
-                (r.subtotale for r in righe if r.piatto.categoria.sempre_a_parte),
+                (r.subtotale for r in righe if r.piatto.categoria.sempre_a_parte or r.extra_a_pagamento),
                 start=0,
             )
-            ha_piatti_fissi = any(not r.piatto.categoria.sempre_a_parte for r in righe)
+            ha_piatti_fissi = any(
+                not r.piatto.categoria.sempre_a_parte and not r.extra_a_pagamento for r in righe
+            )
             totale_fisso = 0
             if ha_piatti_fissi:
                 totale_fisso = self.numero_coperti * self.prezzo_fisso_effettivo
@@ -333,6 +336,15 @@ class RigaOrdine(models.Model):
         blank=True,
         verbose_name="Servita il",
         help_text="Usato per mostrare per qualche minuto il colore 'appena servito' in Sala.",
+    )
+    extra_a_pagamento = models.BooleanField(
+        default=False,
+        verbose_name="Extra a pagamento",
+        help_text=(
+            "Aggiunto dal pulsante 'Extra (a pagamento)': si paga sempre a parte, anche "
+            "se il resto del tavolo è a menù fisso (es. una seconda Panna Cotta oltre a "
+            "quella già inclusa)."
+        ),
     )
 
     class Meta:

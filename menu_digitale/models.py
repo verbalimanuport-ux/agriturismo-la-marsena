@@ -194,29 +194,37 @@ class Piatto(models.Model):
 
     @classmethod
     def attivi(cls, solo_sempre_a_parte=False):
-        """I piatti disponibili del Menù ATTIVO in questo momento — tutti
-        quelli spuntati per quel menù, senza altro filtro (il menù mostra
-        esattamente quello che ci hai messo dentro). Se `solo_sempre_a_parte`
-        è True, restituisce solo quelli di categorie "sempre a parte" (usato
+        """I piatti disponibili da mostrare ora: quelli spuntati per il Menù
+        ATTIVO, PIÙ tutti quelli di categorie "sempre a prezzo singolo"
+        (Vini, Bibite, Caffè...) — questi ultimi compaiono SEMPRE, in ogni
+        edizione, senza bisogno di spuntarli menù per menù: l'unico modo di
+        toglierli è segnarli "Non disponibile" sul singolo piatto. Se
+        `solo_sempre_a_parte` è True, restituisce solo questi ultimi (usato
         per far ordinare al cliente da QR solo gli extra, quando il resto
         del menù fisso è già generato in automatico)."""
-        menu_attivo = Menu.ottieni_attivo()
-        if menu_attivo is None:
-            return cls.objects.none()
-        qs = cls.objects.filter(disponibile=True, menus=menu_attivo)
         if solo_sempre_a_parte:
-            qs = qs.filter(categoria__sempre_a_parte=True)
-        return qs
+            return cls.objects.filter(disponibile=True, categoria__sempre_a_parte=True)
+        menu_attivo = Menu.ottieni_attivo()
+        sempre_a_parte = models.Q(disponibile=True, categoria__sempre_a_parte=True)
+        if menu_attivo is None:
+            return cls.objects.filter(sempre_a_parte)
+        nel_menu = models.Q(disponibile=True, menus=menu_attivo)
+        return cls.objects.filter(sempre_a_parte | nel_menu).distinct()
 
 
 def categorie_con_piatti_per_menu(menu):
-    """Le categorie che hanno almeno un piatto in QUESTO menù, ciascuna con
-    l'elenco dei suoi piatti (attributo `piatti_attivi`). Usata sia dal
-    menù pubblico sia dalla pagina QR in sola consultazione, per non
-    ripetere la stessa logica due volte."""
+    """Le categorie con almeno un piatto da mostrare per QUESTO menù,
+    ciascuna con l'elenco dei suoi piatti (attributo `piatti_attivi`): i
+    piatti spuntati per quel menù, PIÙ tutti quelli di categorie "sempre a
+    prezzo singolo" (Vini, Bibite...), che compaiono automaticamente in
+    ogni edizione. Usata sia dal menù pubblico sia dalla pagina QR in sola
+    consultazione, per non ripetere la stessa logica due volte."""
+    sempre_a_parte = models.Q(disponibile=True, categoria__sempre_a_parte=True)
     if menu is None:
-        return []
-    piatti = Piatto.objects.filter(menus=menu, disponibile=True).select_related("categoria")
+        piatti = Piatto.objects.filter(sempre_a_parte).select_related("categoria")
+    else:
+        nel_menu = models.Q(disponibile=True, menus=menu)
+        piatti = Piatto.objects.filter(sempre_a_parte | nel_menu).distinct().select_related("categoria")
     mappa = {}
     for piatto in piatti:
         voce = mappa.setdefault(piatto.categoria_id, {"categoria": piatto.categoria, "piatti": []})

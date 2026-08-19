@@ -886,7 +886,43 @@ in un menù fisso. Ora è un interruttore sulla **Categoria** (non più sul piat
 `/admin/menu_digitale/categoria/` → spunta **"Sempre a prezzo singolo"** per quella
 categoria, una volta sola, vale per tutti i menù.
 
-## 60. Prossimo passo
+## 61. Bevande automatiche, extra a pagamento, Sala a bottoni
+
+⚠️ Due nuove migrazioni (una per menù_digitale, non serve stavolta perché il cambiamento
+è solo nella logica; una per ordini):
+
+```
+python manage.py migrate
+```
+
+### 🥤 Vini/Bibite compaiono da soli in ogni menù
+Le categorie marcate **"Sempre a prezzo singolo"** (da `/admin/menu_digitale/categoria/`)
+ora compaiono **automaticamente in ogni edizione di menù**, senza bisogno di spuntarle una
+per una. L'unico modo di escludere un piatto è segnarlo **"Non disponibile"** sulla sua
+scheda (es. la Coca Cola finita) — sparisce ovunque, subito.
+
+### ➕ Extra a pagamento nel menù fisso
+Corretto un bug reale: se durante una cena a menù fisso il cliente chiedeva un secondo
+piatto in più (es. un'altra Panna Cotta), il sistema lo inseriva ma **non lo contava nel
+conto** (il totale del fisso è una cifra fissa a persona, indifferente alle quantità).
+
+Ora sulla pagina del tavolo c'è un pulsante dedicato **"➕ Extra (a pagamento)"**: qualsiasi
+cosa aggiunta da lì **si paga sempre a parte**, anche con il menù fisso, e compare sul
+preconto come voce separata con l'etichetta "(a pagamento)".
+
+### 🍽️🥤 Sala: pulsanti grandi al posto del menù a tendina
+Il vecchio modulo con la tendina unica (cibo e bevande mischiati) è sparito. Al suo posto,
+tre pulsanti grandi che aprono una finestra a schermo intero:
+- **🍽️ Aggiungi cibo** — solo le portate
+- **🥤 Aggiungi bevanda** — solo vini/bibite/caffè
+- **➕ Extra (a pagamento)** — solo cibo, sempre fatturato a parte
+
+Ogni piatto è un bottone grande, raggruppato per categoria — **nessuna barra di ricerca**,
+si vede tutto a colpo d'occhio. Toccando un piatto si aggiunge subito (i tocchi ripetuti
+sullo stesso piatto si sommano, non creano righe doppie) e la finestra **si riapre da
+sola**, pronta per il piatto successivo, senza doverla riaprire ogni volta a mano.
+
+## 62. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.

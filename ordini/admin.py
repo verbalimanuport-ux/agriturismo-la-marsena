@@ -7,7 +7,7 @@ class RigaOrdineInline(admin.TabularInline):
     model = RigaOrdine
     extra = 0
     readonly_fields = ("subtotale",)
-    fields = ("piatto", "quantita", "prezzo_unitario", "portata", "origine", "inviato_da", "stato", "note", "subtotale")
+    fields = ("piatto", "quantita", "prezzo_unitario", "portata", "extra_a_pagamento", "origine", "inviato_da", "stato", "note", "subtotale")
 
 
 @admin.register(Ordine)

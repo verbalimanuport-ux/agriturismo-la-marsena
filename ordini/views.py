@@ -226,6 +226,32 @@ def gestisci_tavolo(request, tavolo_id):
                     stato=RigaOrdine.STATO_BOZZA,
                 )
                 messages.success(request, f"{piatto.nome} aggiunto — premi \"Invia in cucina\" quando hai finito.")
+        elif azione in ("aggiungi_rapido", "aggiungi_extra"):
+            # Un tocco solo dai pulsanti "Aggiungi cibo/bevanda" o "Extra a
+            # pagamento" in Sala: aggiunge 1 unità, unendola a una riga
+            # bozza già esistente dello stesso piatto (senza note) invece di
+            # creare righe duplicate se si tocca più volte lo stesso piatto.
+            piatto_id = request.POST.get("piatto_id")
+            piatto = Piatto.objects.filter(id=piatto_id, disponibile=True).first()
+            if piatto is not None:
+                e_extra = azione == "aggiungi_extra"
+                riga = ordine.righe.filter(
+                    piatto=piatto, stato=RigaOrdine.STATO_BOZZA, note="", extra_a_pagamento=e_extra
+                ).first()
+                if riga is not None:
+                    riga.quantita += 1
+                    riga.save()
+                else:
+                    RigaOrdine.objects.create(
+                        ordine=ordine,
+                        piatto=piatto,
+                        quantita=1,
+                        origine=RigaOrdine.ORIGINE_STAFF,
+                        inviato_da=request.user,
+                        portata=piatto.categoria.ordine or 1,
+                        stato=RigaOrdine.STATO_BOZZA,
+                        extra_a_pagamento=e_extra,
+                    )
         elif azione == "rimuovi":
             riga_id = request.POST.get("riga_id")
             RigaOrdine.objects.filter(id=riga_id, ordine=ordine).delete()
@@ -358,6 +384,21 @@ def gestisci_tavolo(request, tavolo_id):
         return redirect("ordini:gestisci_tavolo", tavolo_id=tavolo.id)
 
     form = AggiungiPiattoForm()
+
+    # Per i pulsanti "Aggiungi cibo" / "Aggiungi bevanda" / "Extra a
+    # pagamento": tutti i piatti disponibili, raggruppati per categoria,
+    # divisi in base a "Richiede cucina" (cibo) o no (bevande). Nessuna
+    # ricerca: si vede tutto a colpo d'occhio, come richiesto.
+    piatti_cibo_per_categoria = {}
+    piatti_bevande_per_categoria = {}
+    for p in Piatto.attivi().select_related("categoria").order_by(
+        "categoria__ordine", "categoria__nome", "ordine", "nome"
+    ):
+        bucket = piatti_cibo_per_categoria if p.categoria.richiede_cucina else piatti_bevande_per_categoria
+        bucket.setdefault(p.categoria, []).append(p)
+    piatti_cibo_gruppi = sorted(piatti_cibo_per_categoria.items(), key=lambda kv: (kv[0].ordine, kv[0].nome))
+    piatti_bevande_gruppi = sorted(piatti_bevande_per_categoria.items(), key=lambda kv: (kv[0].ordine, kv[0].nome))
+
     tutte_le_righe = list(
         ordine.righe.select_related("piatto__categoria", "inviato_da").order_by(
             "portata", "creata_il"
@@ -401,6 +442,8 @@ def gestisci_tavolo(request, tavolo_id):
             "giri": giri,
             "giri_pronti": giri_pronti,
             "da_consegnare": da_consegnare,
+            "piatti_cibo_gruppi": piatti_cibo_gruppi,
+            "piatti_bevande_gruppi": piatti_bevande_gruppi,
             "voci_in_sospeso": sum(
                 1 for r in tutte_le_righe if r.stato != RigaOrdine.STATO_SERVITO
             ),
@@ -597,7 +640,7 @@ def preconto(request, ordine_id):
     voci_singole = []
     coperti_menu_fisso = 0
     for r in righe:
-        if modalita_fissa and not r.piatto.categoria.sempre_a_parte:
+        if modalita_fissa and not r.piatto.categoria.sempre_a_parte and not r.extra_a_pagamento:
             coperti_menu_fisso = ordine.numero_coperti
             continue
         voci_singole.append(r)
