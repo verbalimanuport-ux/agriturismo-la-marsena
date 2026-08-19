@@ -15,6 +15,12 @@
     {% if menu_attivo %}<p class="text-muted small mb-0">{{ menu_attivo.nome }}</p>{% endif %}
   </div>
 
+  {% if e_anteprima %}
+    <div class="text-center p-2 mb-3 small" style="background-color: var(--color-bg); border-radius: var(--radius-md); color: var(--color-muted); border: 1px solid var(--color-border);">
+      📅 Anteprima — non è il menù servito oggi{% if menu_attivo.data_inizio %}, disponibile dal {{ menu_attivo.data_inizio|date:"d/m/Y" }}{% endif %}
+    </div>
+  {% endif %}
+
   <div style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-soft); padding: 2.75rem 2rem;">
 
     <div style="height:1px; background: var(--color-border);"></div>

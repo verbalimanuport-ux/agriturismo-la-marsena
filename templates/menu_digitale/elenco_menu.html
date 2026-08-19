@@ -35,9 +35,7 @@
       {% if menu.modalita_attiva == "fisso" and menu.prezzo_menu_fisso_a_persona > 0 %}
         <p class="small mb-0 fw-semibold">Menù fisso: &euro;{{ menu.prezzo_menu_fisso_a_persona }} a persona</p>
       {% endif %}
-      {% if menu.attivo %}
-        <a href="{% url 'menu_digitale:menu' %}" class="btn btn-sm btn-outline-success mt-2">Guarda i piatti →</a>
-      {% endif %}
+      <a href="{% url 'menu_digitale:menu_dettaglio' menu.id %}" class="btn btn-sm btn-outline-success mt-2">Guarda i piatti →</a>
     </div>
   {% empty %}
     <p class="text-center text-muted">Nessun menù ancora pubblicato. Torna a trovarci presto!</p>

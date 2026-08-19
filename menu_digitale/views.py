@@ -1,7 +1,7 @@
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 
 from .models import ImpostazioniMenu, Menu, categorie_con_piatti_per_menu
 
@@ -16,6 +16,28 @@ def menu_pubblico(request):
         request,
         "menu_digitale/menu.html",
         {"categorie": categorie, "menu_attivo": menu_attivo, "impostazioni": impostazioni},
+    )
+
+
+def menu_dettaglio(request, menu_id):
+    """Pagina pubblica con i piatti di UN Menù specifico, ANCHE se non è
+    quello attivo ora — usata dalla pagina "Tutti i menù" per far sfogliare
+    ai clienti anche le edizioni future, con un avviso se non è il menù
+    servito oggi davvero."""
+    menu = get_object_or_404(Menu, id=menu_id)
+    impostazioni = ImpostazioniMenu.ottieni()
+    categorie = categorie_con_piatti_per_menu(menu)
+    menu_veramente_attivo = Menu.ottieni_attivo()
+    e_anteprima = menu_veramente_attivo is None or menu.id != menu_veramente_attivo.id
+    return render(
+        request,
+        "menu_digitale/menu.html",
+        {
+            "categorie": categorie,
+            "menu_attivo": menu,
+            "impostazioni": impostazioni,
+            "e_anteprima": e_anteprima,
+        },
     )
 
 
