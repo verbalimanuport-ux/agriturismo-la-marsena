@@ -210,8 +210,10 @@ class Ordine(models.Model):
     def stato_sala(self):
         """Stato sintetico a 6 valori per colorare il tavolo in Sala/Cucina/
         Mappa (il settimo colore, 'libero', si applica quando non c'è nessun
-        ordine aperto — non serve calcolarlo qui, lo decide chi chiama)."""
-        righe = list(self.righe.all())
+        ordine aperto — non serve calcolarlo qui, lo decide chi chiama).
+        Parla SOLO del cibo (categorie che richiedono cucina): le bevande
+        hanno una casellina separata, non influenzano mai questo colore."""
+        righe = [r for r in self.righe.all() if r.piatto.categoria.richiede_cucina]
         if not righe:
             return "in_attesa_ordini"
         if any(r.stato == RigaOrdine.STATO_PRONTO for r in righe):

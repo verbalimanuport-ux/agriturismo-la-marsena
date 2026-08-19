@@ -38,6 +38,7 @@ def _riepilogo_tavoli():
                     "tavolo": t,
                     "ordine": None,
                     "pronti": 0,
+                    "pronti_totale": 0,
                     "stato_sala": "libero",
                     "giro": None,
                     "bevande_da_servire": False,
@@ -46,10 +47,15 @@ def _riepilogo_tavoli():
             )
             continue
         righe = list(ordine.righe.all())
-        pronti = sum(1 for r in righe if r.stato == RigaOrdine.STATO_PRONTO)
-        # Le bevande sono indipendenti dal "Giro" (che riguarda solo il
-        # cibo): una casellina a parte, così le due informazioni non si
-        # cancellano a vicenda quando capitano nello stesso momento.
+        # "pronti" guida il riquadro GRANDE (colore + testo "N pronti · Giro
+        # X"): parla solo di cibo, come richiesto — le bevande vivono solo
+        # nella casellina separata qui sotto, mai nel riquadro principale.
+        pronti = sum(
+            1 for r in righe if r.stato == RigaOrdine.STATO_PRONTO and r.piatto.categoria.richiede_cucina
+        )
+        # Tenuto a parte (cibo + bevande insieme) solo per non silenziare
+        # l'avviso sonoro quando è pronta una bevanda.
+        pronti_totale = sum(1 for r in righe if r.stato == RigaOrdine.STATO_PRONTO)
         bevande_da_servire = any(
             r.stato == RigaOrdine.STATO_PRONTO and not r.piatto.categoria.richiede_cucina
             for r in righe
@@ -66,6 +72,7 @@ def _riepilogo_tavoli():
                 "tavolo": t,
                 "ordine": ordine,
                 "pronti": pronti,
+                "pronti_totale": pronti_totale,
                 "stato_sala": ordine.stato_sala,
                 "giro": ordine.giro_in_evidenza,
                 "bevande_da_servire": bevande_da_servire,
@@ -177,7 +184,10 @@ def sala(request):
     """Vista d'insieme per lo staff: colore e stato di ogni tavolo, quanti
     piatti sono pronti da ritirare."""
     dati = _riepilogo_tavoli()
-    totale_pronti = sum(d["pronti"] for d in dati)
+    # Il suono avvisa per cibo E bevande insieme (altrimenti una bevanda
+    # pronta non farebbe mai scattare l'avviso); il riquadro visivo invece
+    # resta scoped al solo cibo, come deciso.
+    totale_pronti = sum(d["pronti_totale"] for d in dati)
     return render(
         request,
         "ordini/sala.html",
