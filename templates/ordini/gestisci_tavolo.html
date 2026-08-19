@@ -69,7 +69,7 @@
     </div>
     <div class="table-responsive mb-0">
       <table class="table align-middle mb-0">
-        <thead><tr><th>Qtà</th><th>Piatto</th><th>Giro</th><th>Step</th><th>Note per la cucina</th><th></th></tr></thead>
+        <thead><tr><th>Qtà</th><th>Piatto</th><th>Giro</th><th>Note per la cucina</th><th></th></tr></thead>
         <tbody>
           {% for riga in righe_bozza %}
           <tr>
@@ -82,15 +82,6 @@
               {% if riga.piatto.categoria.richiede_cucina %}
                 <input type="number" name="portata_riga_{{ riga.id }}" min="1" value="{{ riga.portata }}"
                        class="form-control form-control-sm campo-auto" data-riga="{{ riga.id }}" data-campo="portata" style="width:60px;">
-              {% else %}
-                <span class="text-muted">—</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if riga.piatto.categoria.richiede_cucina %}
-                <input type="number" name="step_riga_{{ riga.id }}" min="1" value="{{ riga.step }}"
-                       class="form-control form-control-sm campo-auto" data-riga="{{ riga.id }}" data-campo="step" style="width:60px;"
-                       title="Sotto-passo: lascia 1 salvo per menù degustazione con più portate in sequenza nello stesso giro">
               {% else %}
                 <span class="text-muted">—</span>
               {% endif %}
@@ -120,8 +111,9 @@
 
   <p class="text-muted small mb-4">
     ✅ Le modifiche (quantità, giro, note) si salvano da sole appena esci dal campo —
-    non serve premere nulla. Quando hai finito, premi "Invia in cucina" — il giro comparirà
-    al cuoco, ma partirà davvero solo quando premi "Via libera cucina" più sotto.
+    non serve premere nulla. Quando hai finito, premi "Invia in cucina" — ogni piatto
+    comparirà al cuoco, ma partirà davvero solo quando dai il via libera piatto per
+    piatto qui sotto.
   </p>
 {% endif %}
 
@@ -157,45 +149,15 @@
 
 {% for giro in giri %}
   <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
-    <span class="badge" style="background-color: var(--color-accent);">
-      Giro {{ giro.numero }}{% if giro.mostra_step %}.{{ giro.step }}{% endif %}
-    </span>
-    {% if giro.stato_giro == "previsto" %}
-      <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="azione" value="via_libera_giro">
-        <input type="hidden" name="portata" value="{{ giro.numero }}">
-        <input type="hidden" name="step" value="{{ giro.step }}">
-        <button type="submit" class="btn btn-lg" style="background-color: var(--color-in-cucina); color:#fff; font-weight:600;">
-          🟢 Via libera cucina
-        </button>
-      </form>
-    {% elif giro.stato_giro == "in_cucina" %}
-      <span class="badge" style="background-color: var(--color-verde-acceso);">👨‍🍳 In cucina</span>
-    {% elif giro.stato_giro == "pronto" %}
-      <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="azione" value="giro_servito">
-        <input type="hidden" name="portata" value="{{ giro.numero }}">
-        <input type="hidden" name="step" value="{{ giro.step }}">
-        <button type="submit" class="btn btn-lg" style="background-color: var(--color-accent); color:#fff; font-weight:600;">
-          🔔 Pronto — tocca per segnare servito
-        </button>
-      </form>
-    {% else %}
-      <span class="badge" style="background-color: var(--color-primary);">Servito</span>
-    {% endif %}
+    <span class="badge" style="background-color: var(--color-accent);">Giro {{ giro.numero }}</span>
   </div>
-  {% if giro.stato_giro == "previsto" %}
-    <p class="text-muted small mb-2">La cucina vede già questo giro per organizzarsi, ma parte solo quando dai il via libera.</p>
-  {% endif %}
 
-  <div class="table-responsive mb-2" style="{% if giro.stato_giro == 'previsto' %}opacity:0.6;{% endif %}">
+  <div class="table-responsive mb-2">
   <table class="table align-middle">
-    <thead><tr><th>Qtà</th><th>Piatto</th><th>Note</th><th>Da</th><th>Prezzo</th><th></th></tr></thead>
+    <thead><tr><th>Qtà</th><th>Piatto</th><th>Note</th><th>Da</th><th>Prezzo</th><th>Stato</th><th></th></tr></thead>
     <tbody>
       {% for riga in giro.righe %}
-      <tr>
+      <tr style="{% if riga.stato == 'previsto' %}opacity:0.55;{% elif riga.stato == 'in_attesa' %}background-color: rgba(47,168,79,0.07);{% endif %}">
         <td>{{ riga.quantita }}</td>
         <td>{{ riga.piatto.nome }}</td>
         <td>{{ riga.note|default:"—" }}</td>
@@ -203,6 +165,31 @@
         <td>
           {% if impostazioni.modalita_attiva != "fisso" or riga.piatto.tipo_menu != "fisso" %}
             &euro;{{ riga.subtotale }}
+          {% endif %}
+        </td>
+        <td>
+          {% if riga.stato == "previsto" %}
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="azione" value="via_libera_riga">
+              <input type="hidden" name="riga_id" value="{{ riga.id }}">
+              <button type="submit" class="btn btn-sm" style="background-color: var(--color-in-cucina); color:#fff; font-weight:600;">
+                🟢 Via libera
+              </button>
+            </form>
+          {% elif riga.stato == "in_attesa" %}
+            <span class="badge" style="background-color: var(--color-verde-acceso);">👨‍🍳 In cucina</span>
+          {% elif riga.stato == "pronto" %}
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="azione" value="consegnato">
+              <input type="hidden" name="riga_id" value="{{ riga.id }}">
+              <button type="submit" class="btn btn-sm" style="background-color: var(--color-accent); color:#fff; font-weight:600;">
+                🔔 Pronto — consegna
+              </button>
+            </form>
+          {% else %}
+            <span class="badge" style="background-color: var(--color-primary);">Servito</span>
           {% endif %}
         </td>
         <td class="text-end">
@@ -223,6 +210,11 @@
     <p class="text-muted">Nessun piatto ordinato per questo tavolo.</p>
   {% endif %}
 {% endfor %}
+
+<p class="text-muted small mb-4">
+  "Giro" è solo un'etichetta di orientamento. Ogni piatto ha il suo via libera e il suo
+  "pronto": due piatti diversi dello stesso giro possono avanzare in modo indipendente.
+</p>
 
 <div class="d-flex justify-content-between align-items-center mt-4 flex-wrap gap-3">
   <p class="fs-4 fw-bold mb-0">Totale: &euro;{{ ordine.totale }}</p>
@@ -254,7 +246,7 @@
       campo.dataset.valorePrecedente = campo.value;
 
       var tipo = campo.dataset.campo;
-      var azione = tipo === 'note' ? 'cambia_note' : (tipo === 'portata' ? 'cambia_portata' : (tipo === 'step' ? 'cambia_step' : 'cambia_quantita'));
+      var azione = tipo === 'note' ? 'cambia_note' : (tipo === 'portata' ? 'cambia_portata' : 'cambia_quantita');
 
       var dati = new FormData();
       dati.append('csrfmiddlewaretoken', token);

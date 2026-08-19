@@ -196,13 +196,6 @@ def gestisci_tavolo(request, tavolo_id):
                         RigaOrdine.objects.filter(id=riga_id, ordine=ordine).update(portata=valore)
                 except (TypeError, ValueError):
                     pass
-            elif azione == "cambia_step":
-                try:
-                    valore = int(request.POST.get("step"))
-                    if valore > 0:
-                        RigaOrdine.objects.filter(id=riga_id, ordine=ordine).update(step=valore)
-                except (TypeError, ValueError):
-                    pass
             elif azione == "cambia_quantita":
                 try:
                     valore = int(request.POST.get("quantita"))
@@ -242,15 +235,6 @@ def gestisci_tavolo(request, tavolo_id):
                         portata=nuova_portata
                     )
                     messages.success(request, f"Spostato al giro {nuova_portata}.")
-            except (TypeError, ValueError):
-                pass
-        elif azione == "cambia_step":
-            try:
-                riga_id = request.POST.get("riga_id")
-                nuovo_step = int(request.POST.get("step"))
-                if nuovo_step > 0:
-                    RigaOrdine.objects.filter(id=riga_id, ordine=ordine).update(step=nuovo_step)
-                    messages.success(request, f"Spostato allo step {nuovo_step}.")
             except (TypeError, ValueError):
                 pass
         elif azione == "cambia_note":
@@ -309,24 +293,17 @@ def gestisci_tavolo(request, tavolo_id):
                 )
             else:
                 messages.info(request, "Non c'era nulla da inviare.")
-        elif azione == "via_libera_giro":
-            portata = request.POST.get("portata")
-            step = request.POST.get("step") or "1"
+        elif azione == "via_libera_riga":
+            riga_id = request.POST.get("riga_id")
             adesso = timezone.now()
-            aggiornate = RigaOrdine.objects.filter(
-                ordine=ordine, portata=portata, step=step, stato=RigaOrdine.STATO_PREVISTO
-            ).update(stato=RigaOrdine.STATO_IN_ATTESA, inviata_il=adesso)
-            etichetta = portata if step == "1" else f"{portata}.{step}"
-            if aggiornate:
-                messages.success(request, f"Via libera dato al giro {etichetta}: ora è in cucina.")
-        elif azione == "giro_servito":
-            portata = request.POST.get("portata")
-            step = request.POST.get("step") or "1"
-            etichetta = portata if step == "1" else f"{portata}.{step}"
-            RigaOrdine.objects.filter(
-                ordine=ordine, portata=portata, step=step, stato=RigaOrdine.STATO_PRONTO
-            ).update(stato=RigaOrdine.STATO_SERVITO)
-            messages.success(request, f"Giro {etichetta} segnato come servito.")
+            riga = RigaOrdine.objects.filter(
+                id=riga_id, ordine=ordine, stato=RigaOrdine.STATO_PREVISTO
+            ).select_related("piatto").first()
+            if riga is not None:
+                riga.stato = RigaOrdine.STATO_IN_ATTESA
+                riga.inviata_il = adesso
+                riga.save()
+                messages.success(request, f"Via libera dato: {riga.piatto.nome} è ora in cucina.")
         elif azione == "storna":
             riga_id = request.POST.get("riga_id")
             riga = RigaOrdine.objects.filter(id=riga_id, ordine=ordine).select_related("piatto").first()
@@ -379,7 +356,7 @@ def gestisci_tavolo(request, tavolo_id):
     form = AggiungiPiattoForm()
     tutte_le_righe = list(
         ordine.righe.select_related("piatto__categoria", "inviato_da").order_by(
-            "portata", "step", "creata_il"
+            "portata", "creata_il"
         )
     )
 
@@ -392,38 +369,15 @@ def gestisci_tavolo(request, tavolo_id):
     ]
     giri_map = {}
     for riga in righe_cucina:
-        giri_map.setdefault((riga.portata, riga.step), []).append(riga)
+        giri_map.setdefault(riga.portata, []).append(riga)
 
-    # Per ogni numero di giro, quanti step diversi sono in corso: se solo uno,
-    # mostriamo "Giro 2" semplice; se più di uno, "Giro 2.1", "Giro 2.2"...
-    step_per_giro = {}
-    for (numero, step) in giri_map.keys():
-        step_per_giro.setdefault(numero, set()).add(step)
+    # Il "giro" è solo un'etichetta di orientamento (Antipasti, Primi...): il
+    # via libera e il "pronto" restano sempre per singolo piatto, non per
+    # l'intero giro — piatti diversi nello stesso giro possono essere a punti
+    # diversi (es. la Spigola pronta mentre il Filetto è ancora Previsto).
+    giri = [{"numero": numero, "righe": giri_map[numero]} for numero in sorted(giri_map.keys())]
 
-    giri = []
-    for (numero, step) in sorted(giri_map.keys()):
-        righe_giro = giri_map[(numero, step)]
-        stati = {r.stato for r in righe_giro}
-        if RigaOrdine.STATO_PREVISTO in stati:
-            stato_giro = "previsto"
-        elif RigaOrdine.STATO_IN_ATTESA in stati:
-            stato_giro = "in_cucina"
-        elif RigaOrdine.STATO_PRONTO in stati:
-            stato_giro = "pronto"
-        else:
-            stato_giro = "servito"
-        mostra_step = len(step_per_giro[numero]) > 1
-        giri.append(
-            {
-                "numero": numero,
-                "step": step,
-                "mostra_step": mostra_step,
-                "stato_giro": stato_giro,
-                "righe": righe_giro,
-            }
-        )
-
-    giri_pronti = sum(1 for g in giri if g["stato_giro"] == "pronto")
+    giri_pronti = sum(1 for r in righe_cucina if r.stato == RigaOrdine.STATO_PRONTO)
 
     da_consegnare = [
         r
@@ -454,20 +408,20 @@ def gestisci_tavolo(request, tavolo_id):
 @login_required
 def cucina(request):
     """Vista per la cucina: cosa preparare, raggruppato per tavolo e per giro
-    (solo per le categorie che richiedono cucina: vini/bibite/caffè non
-    compaiono mai qui). Include anche i giri "Previsti" — inviati dal
+    (solo un'etichetta di orientamento — Antipasti, Primi... — non un'unità
+    di controllo) e per categoria che richiede cucina (vini/bibite/caffè non
+    compaiono mai qui). Include anche i piatti "Previsti" — inviati dal
     cameriere ma non ancora avviati col via libera — per permettere di
-    organizzarsi in anticipo, mostrati però senza cronometro e senza pulsante,
-    dato che non si può ancora agire su di loro. Un solo pulsante 'Pronto' per
-    l'intero giro attivo (non per singolo piatto): una volta segnato, il giro
-    sparisce da qui — da lì in poi tocca al cameriere, che lo vede pronto
-    sulla pagina del tavolo e lo consegna."""
+    organizzarsi in anticipo, mostrati però attenuati e senza pulsante, dato
+    che non si può ancora agire su di loro. Il via libera e il "Pronto" sono
+    SEMPRE per singolo piatto, mai per l'intero giro insieme: piatti diversi
+    nello stesso giro (es. due secondi diversi in un menù degustazione)
+    procedono in modo indipendente, uno può essere pronto mentre l'altro non
+    è ancora nemmeno partito."""
     if request.method == "POST":
-        ordine_id = request.POST.get("ordine_id")
-        portata = request.POST.get("portata")
-        step = request.POST.get("step") or "1"
+        riga_id = request.POST.get("riga_id")
         RigaOrdine.objects.filter(
-            ordine_id=ordine_id, portata=portata, step=step, stato=RigaOrdine.STATO_IN_ATTESA
+            id=riga_id, stato=RigaOrdine.STATO_IN_ATTESA
         ).update(stato=RigaOrdine.STATO_PRONTO)
         return redirect("ordini:cucina")
 
@@ -478,7 +432,7 @@ def cucina(request):
             piatto__categoria__richiede_cucina=True,
         )
         .select_related("ordine__tavolo", "piatto__categoria", "inviato_da")
-        .order_by("ordine__aperto_il", "portata", "step", "creata_il")
+        .order_by("ordine__aperto_il", "portata", "creata_il")
     )
 
     adesso = timezone.now()

@@ -707,7 +707,37 @@ compare il pulsante "Pronto".
 anche (anzi, soprattutto) quando il cameriere dà il via libera a un giro, il momento in
 cui la cucina deve davvero accorgersene.
 
-## 50. Prossimo passo
+## 51. Correzione: controllo per singolo piatto, non più per giro/step
+
+Nuova migrazione (rimuove il campo "step" appena introdotto, non serve più):
+
+```
+python manage.py migrate
+```
+
+Dopo un confronto con l'uso reale (esempio concreto: due secondi diversi nello stesso
+giro, dove uno resta pronto sotto le lampade ad aspettare l'altro), la struttura
+Giro+Step del punto precedente è stata **sostituita** con qualcosa di più semplice e più
+corretto per come funziona davvero un servizio:
+
+- **Il "Giro"** (Antipasti, Primi, Secondi...) resta solo un'**etichetta di
+  orientamento** — non controlla più nulla
+- **Il via libera e il "Pronto" sono sempre per singolo piatto**, non per l'intero giro:
+  se nello stesso giro ci sono due piatti diversi (es. Spigola e Filetto), ciascuno ha il
+  suo pulsante indipendente. Un piatto ripetuto per più persone (es. "6x Tagliere")
+  resta comunque un'unica riga con un unico pulsante — è davvero una sola preparazione
+- **Zero configurazione in più** rispetto a prima: non c'è nessun numero da impostare da
+  nessuna parte, il sistema è già granulare per natura (una riga = un piatto)
+
+**In Cucina**: ogni piatto ancora "Previsto" (non attivato) è mostrato attenuato al 50%,
+senza pulsante. Appena il cameriere dà il via libera (dalla pagina del tavolo, pulsante
+"🟢 Via libera" su quel piatto), la card si accende con **bordo verde acceso**, parte il
+cronometro, e compare il pulsante "✅ Pronto" — sempre riferito solo a quel piatto.
+
+**Sulla pagina del tavolo**: ogni riga della tabella ha ora la sua colonna "Stato" con
+il pulsante giusto (Via libera / In cucina / Pronto — consegna / Servito).
+
+## 52. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.

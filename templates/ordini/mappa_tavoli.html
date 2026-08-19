@@ -150,7 +150,7 @@
       el.textContent = t.numero;
       if (t.giro) {
         var etichettaGiro = document.createElement('div');
-        etichettaGiro.textContent = 'G' + t.giro.numero + (t.giro.step ? '.' + t.giro.step : '');
+        etichettaGiro.textContent = 'G' + t.giro.numero;
         etichettaGiro.style.cssText = 'font-size:0.65rem; font-weight:500; opacity:0.9;';
         el.appendChild(etichettaGiro);
       }

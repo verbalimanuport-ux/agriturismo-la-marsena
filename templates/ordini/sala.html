@@ -22,13 +22,13 @@
           <h5>Tavolo {{ tavolo.numero }}</h5>
           {% if pronti %}
             <span class="badge d-block mb-1" style="background-color: var(--color-accent);">
-              🔔 {{ pronti }} pront{{ pronti|pluralize:"o,i" }}{% if giro %} · Giro {{ giro.numero }}{% if giro.step %}.{{ giro.step }}{% endif %}{% endif %}
+              🔔 {{ pronti }} pront{{ pronti|pluralize:"o,i" }}{% if giro %} · Giro {{ giro.numero }}{% endif %}
             </span>
           {% elif stato == "completo" %}
             <span class="badge d-block mb-1" style="background-color: var(--color-charcoal);">✅ Servizio completo</span>
           {% elif stato == "in_cucina" %}
             <span class="badge d-block mb-1" style="background-color: var(--color-in-cucina);">
-              👨‍🍳 In cucina{% if giro %} · Giro {{ giro.numero }}{% if giro.step %}.{{ giro.step }}{% endif %}{% endif %}
+              👨‍🍳 In cucina{% if giro %} · Giro {{ giro.numero }}{% endif %}
             </span>
             {% if giro.stato == "previsto" %}
               <span class="small d-block" style="color: var(--color-muted);">in attesa del via libera</span>
