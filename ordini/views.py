@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from menu_digitale.models import Categoria, ImpostazioniMenu, Piatto
+from menu_digitale.models import Categoria, ImpostazioniMenu, Menu, Piatto
 from prenotazioni.models import LayoutSala, Tavolo
 
 from .forms import AggiungiPiattoForm
@@ -51,21 +51,27 @@ def _riepilogo_tavoli():
 
 
 def _genera_portate_standard_se_fisso(ordine, utente):
-    """Se è attivo il menù fisso, crea automaticamente una riga per OGNI
-    piatto fisso disponibile, con quantità pari ai coperti del tavolo — nel
-    menù fisso, di norma, tutti i piatti fissi di una categoria (anche se
-    sono più di uno, es. 2 antipasti) vengono serviti a tutti i coperti, non
-    è una scelta tra opzioni. Non tocca mai una riga già esistente verso il
-    basso (non cancella eccezioni già segnate dal cameriere) — al massimo la
-    alza, se sono aumentati i coperti. Le righe partono come "Da inviare":
-    tocca al cameriere premere "Invia in cucina" quando ha finito di comporre
+    """Se questo tavolo è in modalità menù fisso, crea automaticamente una
+    riga per OGNI piatto fisso disponibile DEL MENÙ COLLEGATO A QUESTO
+    TAVOLO (congelato all'apertura, non quello attivo ora — se nel frattempo
+    cambia il menù attivo, questo tavolo continua a generare le portate
+    giuste), con quantità pari ai coperti — nel menù fisso, di norma, tutti
+    i piatti fissi di una categoria (anche se sono più di uno, es. 2
+    antipasti) vengono serviti a tutti i coperti, non è una scelta tra
+    opzioni. Non tocca mai una riga già esistente verso il basso (non
+    cancella eccezioni già segnate dal cameriere) — al massimo la alza, se
+    sono aumentati i coperti. Le righe partono come "Da inviare": tocca al
+    cameriere premere "Invia in cucina" quando ha finito di comporre
     l'ordine (note, extra ecc.)."""
-    impostazioni = ImpostazioniMenu.ottieni()
-    if impostazioni.modalita_attiva != ImpostazioniMenu.MODALITA_FISSO:
+    if ordine.modalita_effettiva != Menu.MODALITA_FISSO:
+        return
+
+    menu_di_riferimento = ordine.menu_applicato or Menu.ottieni_attivo()
+    if menu_di_riferimento is None:
         return
 
     piatti_fissi = Piatto.objects.filter(
-        tipo_menu=Piatto.TIPO_FISSO, disponibile=True
+        tipo_menu=Piatto.TIPO_FISSO, disponibile=True, categoria__menu=menu_di_riferimento
     ).select_related("categoria")
 
     for piatto in piatti_fissi:
@@ -89,28 +95,32 @@ def ordina_tavolo(request, numero_tavolo):
     """Pagina pubblica raggiungibile scansionando il QR code posato sul tavolo.
     Nessun login richiesto.
     - Se "Permetti ordini dal QR" è spento: il cliente vede SOLO il menù/la
-      carta, in sola consultazione, senza nessuna possibilità di ordinare.
+      carta (del menù ATTIVO in questo momento), in sola consultazione, senza
+      nessuna possibilità di ordinare.
     - Se acceso e il menù fisso è attivo: il cliente vede solo gli 'extra' da
       ordinare (bevande ecc.), le portate del menù fisso sono già generate
       automaticamente in base ai coperti.
     - Se acceso e la carta è attiva: il cliente sceglie e ordina normalmente."""
     tavolo = get_object_or_404(Tavolo, numero=numero_tavolo, attivo=True)
     impostazioni = ImpostazioniMenu.ottieni()
+    menu_attivo = Menu.ottieni_attivo()
 
     if not impostazioni.ordini_qr_abilitati:
-        piatti_attivi_qs = Piatto.attivi().order_by("ordine", "nome")
-        tutte_le_categorie = Categoria.objects.prefetch_related(
-            Prefetch("piatti", queryset=piatti_attivi_qs, to_attr="piatti_attivi")
-        ).order_by("ordine", "nome")
-        categorie = [c for c in tutte_le_categorie if c.piatti_attivi]
+        categorie = []
+        if menu_attivo is not None:
+            piatti_attivi_qs = Piatto.attivi().order_by("ordine", "nome")
+            tutte_le_categorie = Categoria.objects.filter(menu=menu_attivo).prefetch_related(
+                Prefetch("piatti", queryset=piatti_attivi_qs, to_attr="piatti_attivi")
+            ).order_by("ordine", "nome")
+            categorie = [c for c in tutte_le_categorie if c.piatti_attivi]
         return render(
             request,
             "ordini/solo_menu_tavolo.html",
-            {"tavolo": tavolo, "categorie": categorie, "impostazioni": impostazioni},
+            {"tavolo": tavolo, "categorie": categorie, "menu_attivo": menu_attivo, "impostazioni": impostazioni},
         )
 
     ordine = Ordine.per_tavolo_aperto(tavolo)
-    solo_extra = impostazioni.modalita_attiva == ImpostazioniMenu.MODALITA_FISSO
+    solo_extra = ordine.modalita_effettiva == Menu.MODALITA_FISSO
 
     if request.method == "POST":
         form = AggiungiPiattoForm(request.POST, solo_extra=solo_extra)
@@ -581,14 +591,15 @@ def preconto(request, ordine_id):
     ordine = get_object_or_404(
         Ordine.objects.select_related("tavolo", "prenotazione"), id=ordine_id
     )
-    impostazioni = ImpostazioniMenu.ottieni()
 
     righe = list(
         ordine.righe.select_related("piatto__categoria").order_by("portata", "creata_il")
     )
 
-    # Righe fatturate a prezzo singolo (carta, vini, bibite...)
-    modalita_fissa = impostazioni.modalita_attiva == ImpostazioniMenu.MODALITA_FISSO
+    # Righe fatturate a prezzo singolo (carta, vini, bibite...) — uso la
+    # modalità CONGELATA di questo conto, non quella del menù attivo ora.
+    modalita_fissa = ordine.modalita_effettiva == Menu.MODALITA_FISSO
+    modalita_solo_carta = ordine.modalita_effettiva == Menu.MODALITA_CARTA
     voci_singole = []
     coperti_menu_fisso = 0
     for r in righe:
@@ -598,12 +609,25 @@ def preconto(request, ordine_id):
         voci_singole.append(r)
 
     totale = ordine.totale
+    totale_coperto = ordine.totale_coperto
     try:
         dividi_per = int(request.GET.get("dividi", ordine.numero_coperti) or 1)
     except (TypeError, ValueError):
         dividi_per = ordine.numero_coperti
     dividi_per = max(1, min(dividi_per, 50))
     quota = (totale / dividi_per) if dividi_per else totale
+
+    # Dati per il calcolatore "Alla romana": disponibile solo in modalità
+    # "solo carta" (nel fisso non ha senso, si mangia tutti uguale).
+    voci_romana = [
+        {
+            "id": r.id,
+            "nome": r.piatto.nome,
+            "quantita": r.quantita,
+            "prezzo_unitario": float(r.prezzo_unitario),
+        }
+        for r in voci_singole
+    ]
 
     return render(
         request,
@@ -614,9 +638,13 @@ def preconto(request, ordine_id):
             "voci_singole": voci_singole,
             "coperti_menu_fisso": coperti_menu_fisso,
             "prezzo_fisso": ordine.prezzo_fisso_effettivo,
+            "totale_coperto": totale_coperto,
             "totale": totale,
             "dividi_per": dividi_per,
             "quota": quota,
+            "modalita_solo_carta": modalita_solo_carta,
+            "voci_romana_json": json.dumps(voci_romana),
+            "coperto_per_persona": float(ImpostazioniMenu.ottieni().prezzo_coperto) if totale_coperto else 0,
             "adesso": timezone.now(),
         },
     )

@@ -6,5 +6,6 @@ app_name = "menu_digitale"
 
 urlpatterns = [
     path("", views.menu_pubblico, name="menu"),
+    path("tutti/", views.elenco_menu, name="elenco_menu"),
     path("impostazioni/", views.impostazioni_menu, name="impostazioni"),
 ]

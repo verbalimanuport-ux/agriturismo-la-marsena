@@ -26,7 +26,7 @@
     <button type="submit" class="btn btn-outline-success w-100">Aggiorna</button>
   </div>
 </form>
-{% if impostazioni.modalita_attiva == "fisso" %}
+{% if ordine.modalita_effettiva == "fisso" %}
   <p class="text-muted small mb-4">
     Con il menù fisso attivo, impostare/aggiornare i coperti genera automaticamente
     tutte le portate del menù fisso qui sotto, come bozza (anche se una categoria ha
@@ -120,7 +120,7 @@
 {% if da_consegnare %}
   <div class="card mb-4" style="border-color: var(--color-accent);">
     <div class="card-header" style="background-color: var(--color-accent-soft);">
-      <strong>🔔 Da consegnare (extra, non passano dalla cucina)</strong>
+      <strong>🍹 In attesa BAR (extra, non passano dalla cucina)</strong>
     </div>
     <div class="table-responsive mb-0">
       <table class="table align-middle mb-0">
@@ -136,7 +136,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="azione" value="consegnato">
                 <input type="hidden" name="riga_id" value="{{ riga.id }}">
-                <button type="submit" class="btn btn-azione btn-sm" style="background-color: var(--color-accent); color:#fff;">✅ Consegnato</button>
+                <button type="submit" class="btn btn-azione btn-sm" style="background-color: var(--color-accent); color:#fff;">→ Consegna al tavolo</button>
               </form>
             </td>
           </tr>
@@ -163,7 +163,7 @@
         <td>{{ riga.note|default:"—" }}</td>
         <td>{{ riga.inviato_da.username|default:riga.get_origine_display }}</td>
         <td>
-          {% if impostazioni.modalita_attiva != "fisso" or riga.piatto.tipo_menu != "fisso" %}
+          {% if ordine.modalita_effettiva != "fisso" or riga.piatto.tipo_menu != "fisso" %}
             &euro;{{ riga.subtotale }}
           {% endif %}
         </td>
@@ -217,7 +217,12 @@
 </p>
 
 <div class="d-flex justify-content-between align-items-center mt-4 flex-wrap gap-3">
-  <p class="fs-4 fw-bold mb-0">Totale: &euro;{{ ordine.totale }}</p>
+  <div>
+    <p class="fs-4 fw-bold mb-0">Totale: &euro;{{ ordine.totale }}</p>
+    {% if ordine.totale_coperto %}
+      <p class="small mb-0" style="color: var(--color-muted);">di cui coperto (&times;{{ ordine.numero_coperti }}): &euro;{{ ordine.totale_coperto }}</p>
+    {% endif %}
+  </div>
   <div class="d-flex gap-2 flex-wrap">
     <a href="{% url 'ordini:preconto' ordine.id %}" class="btn btn-outline-success">🧾 Preconto</a>
     <form method="post" onsubmit="return confirm({% if voci_in_sospeso %}'ATTENZIONE: ci sono ancora {{ voci_in_sospeso }} voci non servite su questo tavolo.\n\nChiudere comunque il conto?'{% else %}'Confermi la chiusura del conto per questo tavolo?'{% endif %});">

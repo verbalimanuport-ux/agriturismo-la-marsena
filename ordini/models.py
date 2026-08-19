@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-from menu_digitale.models import ImpostazioniMenu, Piatto
+from menu_digitale.models import ImpostazioniMenu, Menu, Piatto
 from prenotazioni.models import Prenotazione, Tavolo
 
 SOGLIA_APPENA_SERVITO = timedelta(minutes=4)
@@ -49,6 +49,28 @@ class Ordine(models.Model):
             "cambiato a metà servizio, i conti già aperti non cambiano."
         ),
     )
+    modalita_applicata = models.CharField(
+        max_length=10,
+        choices=Menu.MODALITA_CHOICES,
+        null=True,
+        blank=True,
+        verbose_name="Modalità applicata",
+        help_text=(
+            "Congelata all'apertura del tavolo, come il prezzo: se lo staff cambia "
+            "il menù attivo a metà servizio, i conti già aperti non cambiano modalità."
+        ),
+    )
+    menu_applicato = models.ForeignKey(
+        Menu,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Menù applicato",
+        help_text=(
+            "Il menù che era attivo quando il tavolo è stato aperto — usato per "
+            "generare le portate del fisso anche se nel frattempo cambia il menù attivo."
+        ),
+    )
     stato = models.CharField(
         max_length=10, choices=STATO_CHOICES, default=STATO_APERTO, verbose_name="Stato"
     )
@@ -71,17 +93,23 @@ class Ordine(models.Model):
     @classmethod
     def per_tavolo_aperto(cls, tavolo):
         """Ottiene il conto aperto di un tavolo, creandolo se non esiste ancora.
-        Alla creazione congela il prezzo del menù fisso in vigore in quel
-        momento, così un cambio di prezzo a metà servizio non altera i conti
-        già aperti."""
+        Alla creazione congela prezzo E modalità del menù attivo in quel
+        momento, così un cambio a metà servizio (prezzo, o addirittura menù
+        attivo diverso) non altera i conti già aperti."""
         ordine = cls.objects.filter(tavolo=tavolo, stato=cls.STATO_APERTO).first()
         if ordine is not None:
             return ordine
-        impostazioni = ImpostazioniMenu.ottieni()
+        menu_attivo = Menu.ottieni_attivo()
+        prezzo_fisso = menu_attivo.prezzo_menu_fisso_a_persona if menu_attivo else 0
+        modalita = menu_attivo.modalita_attiva if menu_attivo else Menu.MODALITA_CARTA
         ordine, _creato = cls.objects.get_or_create(
             tavolo=tavolo,
             stato=cls.STATO_APERTO,
-            defaults={"prezzo_menu_fisso_applicato": impostazioni.prezzo_menu_fisso_a_persona},
+            defaults={
+                "prezzo_menu_fisso_applicato": prezzo_fisso,
+                "modalita_applicata": modalita,
+                "menu_applicato": menu_attivo,
+            },
         )
         return ordine
 
@@ -92,30 +120,55 @@ class Ordine(models.Model):
         funzione (conti vecchi, campo ancora vuoto)."""
         if self.prezzo_menu_fisso_applicato is not None:
             return self.prezzo_menu_fisso_applicato
-        return ImpostazioniMenu.ottieni().prezzo_menu_fisso_a_persona
+        menu_attivo = Menu.ottieni_attivo()
+        return menu_attivo.prezzo_menu_fisso_a_persona if menu_attivo else 0
+
+    @property
+    def modalita_effettiva(self):
+        """La modalità da usare per questo conto: quella congelata
+        all'apertura, o quella attuale se il conto è precedente a questa
+        funzione (conti vecchi, campo ancora vuoto)."""
+        if self.modalita_applicata:
+            return self.modalita_applicata
+        menu_attivo = Menu.ottieni_attivo()
+        return menu_attivo.modalita_attiva if menu_attivo else Menu.MODALITA_CARTA
+
+    @property
+    def totale_coperto(self):
+        """Il coperto si aggiunge come voce separata solo se è attivo nelle
+        impostazioni generali E la modalità di questo conto non è il solo
+        menù fisso (lì è già incluso nel prezzo a persona, non si conta due
+        volte)."""
+        impostazioni = ImpostazioniMenu.ottieni()
+        if not impostazioni.coperto_attivo:
+            return 0
+        if self.modalita_effettiva == Menu.MODALITA_FISSO:
+            return 0
+        return self.numero_coperti * impostazioni.prezzo_coperto
 
     @property
     def totale(self):
-        impostazioni = ImpostazioniMenu.ottieni()
         righe = list(self.righe.all())
 
-        if impostazioni.modalita_attiva != ImpostazioniMenu.MODALITA_FISSO:
+        if self.modalita_effettiva != Menu.MODALITA_FISSO:
             # In "Carta" o "Entrambi" tutto si fattura a prezzo singolo,
             # anche i piatti etichettati "menù fisso" (es. quando una volta
             # ogni tanto si decide che tutto il menù è à la carte).
-            return sum((r.subtotale for r in righe), start=0)
+            totale_piatti = sum((r.subtotale for r in righe), start=0)
+        else:
+            # Modalità "Solo menù fisso": i piatti fissi entrano nel calcolo a
+            # persona, tutto il resto (carta/sempre visibile) a prezzo singolo.
+            totale_a_prezzo_singolo = sum(
+                (r.subtotale for r in righe if r.piatto.tipo_menu != Piatto.TIPO_FISSO),
+                start=0,
+            )
+            ha_piatti_fissi = any(r.piatto.tipo_menu == Piatto.TIPO_FISSO for r in righe)
+            totale_fisso = 0
+            if ha_piatti_fissi:
+                totale_fisso = self.numero_coperti * self.prezzo_fisso_effettivo
+            totale_piatti = totale_fisso + totale_a_prezzo_singolo
 
-        # Modalità "Solo menù fisso": i piatti fissi entrano nel calcolo a
-        # persona, tutto il resto (carta/sempre visibile) a prezzo singolo.
-        totale_a_prezzo_singolo = sum(
-            (r.subtotale for r in righe if r.piatto.tipo_menu != Piatto.TIPO_FISSO),
-            start=0,
-        )
-        ha_piatti_fissi = any(r.piatto.tipo_menu == Piatto.TIPO_FISSO for r in righe)
-        totale_fisso = 0
-        if ha_piatti_fissi:
-            totale_fisso = self.numero_coperti * self.prezzo_fisso_effettivo
-        return totale_fisso + totale_a_prezzo_singolo
+        return totale_piatti + self.totale_coperto
 
     def chiudi(self):
         self.stato = self.STATO_CHIUSO
@@ -162,6 +215,11 @@ class Ordine(models.Model):
             return "pronto"
         if all(r.stato == RigaOrdine.STATO_SERVITO for r in righe):
             return "completo"
+        # Qualcosa è già attivo o previsto: quello ha sempre priorità su un
+        # "appena servito" precedente, altrimenti il tavolo resta bloccato su
+        # un colore vecchio anche quando è arrivata una comanda nuova.
+        if any(r.stato in (RigaOrdine.STATO_PREVISTO, RigaOrdine.STATO_IN_ATTESA) for r in righe):
+            return "in_cucina"
         adesso = timezone.now()
         appena_servite = any(
             r.stato == RigaOrdine.STATO_SERVITO
@@ -174,8 +232,6 @@ class Ordine(models.Model):
             # più urgente in questo momento: un colore dedicato, temporaneo,
             # per confermare "consegna riuscita" invece di sparire nel nulla.
             return "appena_servito"
-        if any(r.stato in (RigaOrdine.STATO_PREVISTO, RigaOrdine.STATO_IN_ATTESA) for r in righe):
-            return "in_cucina"
         return "in_attesa_ordini"  # tutto ancora in bozza, non ancora inviato
 
     @property

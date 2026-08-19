@@ -773,7 +773,56 @@ I pulsanti d'azione (Via libera, Pronto, Consegnato, Invia in cucina) ora hanno 
 badge informativi (Servito, In cucina), che restano piatti e senza ombra. A colpo d'occhio
 si distingue cosa richiede un tocco da cosa è solo da leggere.
 
-## 54. Prossimo passo
+## 55. Blocco grande: Menù multipli, Coperto, Conto alla romana
+
+⚠️ **Tre nuove migrazioni**, e questa volta è un cambiamento importante nella struttura:
+
+```
+python manage.py migrate
+```
+
+La prima volta, la migrazione crea automaticamente un **"Menù Principale"** con dentro
+tutto quello che avevate già configurato (categorie, piatti, modalità, prezzo del fisso)
+— non perdete nulla, non dovete ricreare niente a mano.
+
+### 📅 Menù multipli (il cambiamento più grande)
+Ora potete avere **più edizioni di menù** nello stesso sistema (es. "Menù di Agosto",
+"Cena a tema Halloween"), tutte gestite da **/admin/ → Menù**:
+- Ogni Menù ha nome, descrizione, date **informative** (non attivano nulla da sole),
+  modalità (fisso/carta/entrambi) e prezzo del fisso — **tutti campi propri di ogni
+  edizione**, non più globali
+- Solo **un Menù alla volta è "Attivo"** — quello usato davvero per cucina/QR/ordini.
+  Attivandone uno, quello prima si spegne da solo (mai due attivi insieme)
+- I Menù **non scadono mai da soli** e non si cancellano: restano pronti per essere
+  riattivati quando tornano di stagione
+- Nuova pagina pubblica **"Tutti i menù"** (link in home e nel menù di navigazione):
+  i clienti vedono anche le edizioni non ancora attive, con le loro date previste — utile
+  per farli prenotare apposta per un menù che gli piace di più
+- Il QR al tavolo resta come sempre scoped al solo menù di stasera, con un link in più
+  verso questa pagina
+
+**Protezione anti-errore** (stesso principio già usato per il prezzo): modalità e
+edizione di menù vengono **congelate all'apertura di ogni tavolo**. Se cambiate menù
+attivo a metà servizio, i tavoli già aperti continuano regolarmente con quello che
+avevano all'inizio — nessun conto cambia sotto gli occhi del cliente.
+
+**Impostazioni generali** (`/menu/impostazioni/`) ora contiene solo QR, soglia ritardo
+cucina e coperto — tutto il resto si gestisce da /admin/ → Menù.
+
+### 🍞 Coperto
+Nuovo interruttore + importo nelle Impostazioni generali (unico per tutti i menù):
+- **Menù fisso**: mai una voce a parte — sotto il prezzo compare "Coperto incluso"
+- **Carta / Entrambi visibili**: si aggiunge come voce separata nel conto e sul preconto
+  ("Coperto ×N: €X")
+
+### 🍽️ Conto alla romana
+Solo quando la modalità è **"Solo carta"**, sul preconto compare il pulsante **"Dividi
+alla romana"**: apri il calcolatore, aggiungi le persone, assegni quante unità di ogni
+piatto tocca a ciascuno — il subtotale (coperto compreso) si calcola da solo in tempo
+reale. Nessuna modifica al database: è solo uno strumento al momento del conto, il modo
+di ordinare resta identico a sempre.
+
+## 56. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.

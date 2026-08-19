@@ -26,62 +26,68 @@
   </p>
 </div>
 
-<h2 class="h4 mb-3">🔥 Da cucinare ora <span class="badge bg-secondary badge-info">{{ attivi|length }}</span></h2>
+<div class="row">
 
-{% if attivi %}
-<div class="row mb-5">
-  {% for riga in attivi %}
-  <div class="col-md-4 mb-3">
-    <div class="card h-100 {% if riga.in_ritardo %}border-danger border-2{% else %}border-2{% endif %}"
-         style="{% if not riga.in_ritardo %}border-color: var(--color-verde-acceso) !important;{% endif %} background-color: rgba(47,168,79,0.06);">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start">
-          <span class="badge badge-info" style="background-color: var(--color-charcoal);">Tavolo {{ riga.ordine.tavolo.numero }}</span>
-          <span class="badge badge-info {% if riga.in_ritardo %}bg-danger{% else %}bg-secondary{% endif %}">{{ riga.minuti_attesa }} min</span>
-        </div>
-        <h5 class="card-title mt-2 mb-1">{{ riga.quantita }}x {{ riga.piatto.nome }}</h5>
-        <p class="mb-1 text-muted small">{{ riga.piatto.categoria.nome }} · Giro {{ riga.portata }}</p>
-        <p class="mb-1 text-muted small">Cameriere: {{ riga.inviato_da.username|default:riga.get_origine_display }}</p>
-        {% if riga.note %}
-          <div class="mt-2 p-2 d-flex align-items-start gap-2" style="background-color: #FFF4CC; border-left: 4px solid #E0A800; border-radius: 6px;">
-            <span style="font-size: 1.1rem; line-height:1;">⚠️</span>
-            <span class="fw-semibold" style="color: #6B4E00; font-size: 0.95rem;">{{ riga.note }}</span>
+  <!-- Colonna sinistra: da cucinare ORA — grande, la coda di lavoro vera -->
+  <div class="col-lg-8 mb-4">
+    <h2 class="h4 mb-3">🔥 Da cucinare ora <span class="badge bg-secondary badge-info">{{ attivi|length }}</span></h2>
+
+    {% if attivi %}
+    <div class="row">
+      {% for riga in attivi %}
+      <div class="col-md-6 col-xl-4 mb-3">
+        <div class="card h-100 {% if riga.in_ritardo %}border-danger border-2{% else %}border-2{% endif %}"
+             style="{% if not riga.in_ritardo %}border-color: var(--color-verde-acceso) !important;{% endif %} background-color: rgba(47,168,79,0.06);">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+              <span class="badge badge-info" style="background-color: var(--color-charcoal);">Tavolo {{ riga.ordine.tavolo.numero }}</span>
+              <span class="badge badge-info {% if riga.in_ritardo %}bg-danger{% else %}bg-secondary{% endif %}">{{ riga.minuti_attesa }} min</span>
+            </div>
+            <h5 class="card-title mt-2 mb-1">{{ riga.quantita }}x {{ riga.piatto.nome }}</h5>
+            <p class="mb-1 text-muted small">{{ riga.piatto.categoria.nome }} · Giro {{ riga.portata }}</p>
+            <p class="mb-1 text-muted small">Cameriere: {{ riga.inviato_da.username|default:riga.get_origine_display }}</p>
+            {% if riga.note %}
+              <div class="mt-2 p-2 d-flex align-items-start gap-2" style="background-color: #FFF4CC; border-left: 4px solid #E0A800; border-radius: 6px;">
+                <span style="font-size: 1.1rem; line-height:1;">⚠️</span>
+                <span class="fw-semibold" style="color: #6B4E00; font-size: 0.95rem;">{{ riga.note }}</span>
+              </div>
+            {% endif %}
+            <form method="post" class="mt-3">
+              {% csrf_token %}
+              <input type="hidden" name="riga_id" value="{{ riga.id }}">
+              <button type="submit" class="btn btn-azione w-100" style="background-color: var(--color-verde-acceso); color:#fff; font-size:1.05rem; padding:0.6rem;">✅ Pronto</button>
+            </form>
           </div>
-        {% endif %}
-        <form method="post" class="mt-3">
-          {% csrf_token %}
-          <input type="hidden" name="riga_id" value="{{ riga.id }}">
-          <button type="submit" class="btn btn-azione w-100" style="background-color: var(--color-verde-acceso); color:#fff; font-size:1.05rem; padding:0.6rem;">✅ Pronto</button>
-        </form>
-      </div>
-    </div>
-  </div>
-  {% endfor %}
-</div>
-{% else %}
-  <p class="text-muted mb-5">Niente da cucinare in questo momento. 🎉</p>
-{% endif %}
-
-<h2 class="h4 mb-3">⏳ In arrivo <span class="badge bg-secondary badge-info">{{ previsti_per_tavolo|length }} tavol{{ previsti_per_tavolo|length|pluralize:"o,i" }}</span></h2>
-<p class="text-muted small mb-3">Già inviati dal cameriere, in attesa del via libera — per organizzarsi in anticipo.</p>
-
-{% for tavolo, righe_previste in previsti_per_tavolo %}
-  <details class="mb-2" style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
-    <summary class="p-2 px-3" style="cursor:pointer; font-weight:600; list-style:none;">
-      Tavolo {{ tavolo.numero }} <span class="text-muted fw-normal small">({{ righe_previste|length }} piatt{{ righe_previste|length|pluralize:"o,i" }} in attesa)</span>
-    </summary>
-    <div class="px-3 pb-2">
-      {% for riga in righe_previste %}
-        <div class="d-flex justify-content-between align-items-center py-1" style="border-top: 1px solid var(--color-border); font-size: 0.92rem;">
-          <span>{{ riga.quantita }}x {{ riga.piatto.nome }} <span class="text-muted">· {{ riga.piatto.categoria.nome }} (Giro {{ riga.portata }})</span></span>
-          {% if riga.note %}<span class="small" style="color:#6B4E00;">⚠️ {{ riga.note }}</span>{% endif %}
         </div>
+      </div>
       {% endfor %}
     </div>
-  </details>
-{% empty %}
-  <p class="text-muted">Nessun piatto in attesa del via libera al momento.</p>
-{% endfor %}
+    {% else %}
+      <p class="text-muted">Niente da cucinare in questo momento. 🎉</p>
+    {% endif %}
+  </div>
+
+  <!-- Colonna destra: in arrivo — compatta, SEMPRE visibile (niente fisarmonica,
+       che con l'aggiornamento automatico ogni 15s si richiuderebbe sempre). -->
+  <div class="col-lg-4 mb-4">
+    <h2 class="h5 mb-3">⏳ In arrivo</h2>
+    {% for tavolo, righe_previste in previsti_per_tavolo %}
+      <div class="mb-2 p-2" style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 0.88rem;">
+        <div class="fw-bold mb-1" style="color: var(--color-in-cucina);">Tavolo {{ tavolo.numero }}</div>
+        {% for riga in righe_previste %}
+          <div class="d-flex justify-content-between" style="{% if not forloop.first %}border-top: 1px dashed var(--color-border); padding-top:2px; margin-top:2px;{% endif %}">
+            <span>{{ riga.quantita }}x {{ riga.piatto.nome }}</span>
+            <span class="text-muted">G{{ riga.portata }}</span>
+          </div>
+          {% if riga.note %}<div class="small" style="color:#6B4E00;">⚠️ {{ riga.note }}</div>{% endif %}
+        {% endfor %}
+      </div>
+    {% empty %}
+      <p class="text-muted small">Nessun piatto in attesa del via libera al momento.</p>
+    {% endfor %}
+  </div>
+
+</div>
 
 {% endblock %}
 

@@ -13,6 +13,7 @@
       </svg>
     </div>
     <p class="text-muted small">Per ordinare, chiama pure il tuo cameriere — grazie!</p>
+    {% if menu_attivo %}<p class="text-muted small">{{ menu_attivo.nome }}</p>{% endif %}
   </div>
 
   <div style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-soft); padding: 2.75rem 2rem;">
@@ -20,9 +21,10 @@
     <div style="height:1px; background: var(--color-border);"></div>
     <div style="height:1px; background: var(--color-border); margin-top:3px; margin-bottom: 2.25rem;"></div>
 
-    {% if impostazioni.modalita_attiva == "fisso" and impostazioni.prezzo_menu_fisso_a_persona > 0 %}
+    {% if menu_attivo.modalita_attiva == "fisso" and menu_attivo.prezzo_menu_fisso_a_persona > 0 %}
       <div class="text-center p-3 mb-5" style="background-color: var(--color-accent-soft); border-radius: var(--radius-md); color: var(--color-accent-dark); font-weight: 600;">
-        Menù fisso: &euro;{{ impostazioni.prezzo_menu_fisso_a_persona }} a persona
+        Menù fisso: &euro;{{ menu_attivo.prezzo_menu_fisso_a_persona }} a persona
+        {% if impostazioni.coperto_attivo %}<br><span class="small fw-normal">Coperto incluso</span>{% endif %}
       </div>
     {% endif %}
 
@@ -44,7 +46,7 @@
               <img src="{{ piatto.immagine.url }}" alt="{{ piatto.nome }}" width="46" height="46" class="rounded-circle me-3 flex-shrink-0" style="object-fit:cover;">
             {% endif %}
             <span class="fw-semibold" style="font-family:'Fraunces',serif; font-size:1.1rem;">{{ piatto.nome }}</span>
-            {% if impostazioni.modalita_attiva != "fisso" or piatto.tipo_menu != "fisso" %}
+            {% if menu_attivo.modalita_attiva != "fisso" or piatto.tipo_menu != "fisso" %}
               <span class="flex-grow-1 mx-2" style="border-bottom: 1px dotted var(--color-border); transform: translateY(-5px);"></span>
               <span class="flex-shrink-0 fw-semibold" style="color: var(--color-accent); background-color: var(--color-accent-soft); padding: 0.15rem 0.65rem; border-radius: 999px; font-size: 0.92rem;">&euro;{{ piatto.prezzo }}</span>
             {% endif %}
@@ -65,6 +67,10 @@
     <div style="height:1px; background: var(--color-border); margin-top:3px;"></div>
 
   </div>
+
+  <p class="text-center mt-4">
+    <a href="{% url 'menu_digitale:elenco_menu' %}" class="text-decoration-none">📅 Guarda tutti i nostri menù, anche i prossimi →</a>
+  </p>
 
 </div>
 {% endblock %}
