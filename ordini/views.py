@@ -12,7 +12,7 @@ from menu_digitale.models import Categoria, ImpostazioniMenu, Menu, Piatto, cate
 from prenotazioni.models import LayoutSala, Tavolo
 
 from .forms import AggiungiPiattoForm
-from .models import Ordine, RigaOrdine
+from .models import SOGLIA_APPENA_SERVITO, Ordine, RigaOrdine
 
 SOGLIA_ATTESA_MINUTI = 15
 
@@ -28,16 +28,39 @@ def _riepilogo_tavoli():
             "righe__piatto__categoria"
         )
     }
+    adesso = timezone.now()
     risultato = []
     for t in tavoli:
         ordine = ordini_aperti.get(t.id)
         if ordine is None:
             risultato.append(
-                {"tavolo": t, "ordine": None, "pronti": 0, "stato_sala": "libero", "giro": None}
+                {
+                    "tavolo": t,
+                    "ordine": None,
+                    "pronti": 0,
+                    "stato_sala": "libero",
+                    "giro": None,
+                    "bevande_da_servire": False,
+                    "bevande_servite": False,
+                }
             )
             continue
         righe = list(ordine.righe.all())
         pronti = sum(1 for r in righe if r.stato == RigaOrdine.STATO_PRONTO)
+        # Le bevande sono indipendenti dal "Giro" (che riguarda solo il
+        # cibo): una casellina a parte, così le due informazioni non si
+        # cancellano a vicenda quando capitano nello stesso momento.
+        bevande_da_servire = any(
+            r.stato == RigaOrdine.STATO_PRONTO and not r.piatto.categoria.richiede_cucina
+            for r in righe
+        )
+        bevande_servite = any(
+            r.stato == RigaOrdine.STATO_SERVITO
+            and not r.piatto.categoria.richiede_cucina
+            and r.servita_il
+            and (adesso - r.servita_il) < SOGLIA_APPENA_SERVITO
+            for r in righe
+        )
         risultato.append(
             {
                 "tavolo": t,
@@ -45,6 +68,8 @@ def _riepilogo_tavoli():
                 "pronti": pronti,
                 "stato_sala": ordine.stato_sala,
                 "giro": ordine.giro_in_evidenza,
+                "bevande_da_servire": bevande_da_servire,
+                "bevande_servite": bevande_servite,
             }
         )
     return risultato
