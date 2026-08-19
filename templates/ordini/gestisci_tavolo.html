@@ -63,7 +63,7 @@
   <div class="card mb-4" style="border-color: var(--color-border);">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2" style="background-color: var(--color-bg);">
       <strong>📝 Da inviare ({{ righe_bozza|length }})</strong>
-      <button type="submit" class="btn btn-lg" style="background-color: var(--color-accent); color:#fff; font-weight:600;">
+      <button type="submit" class="btn btn-azione btn-lg" style="background-color: var(--color-accent); color:#fff;">
         📤 Invia in cucina
       </button>
     </div>
@@ -136,7 +136,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="azione" value="consegnato">
                 <input type="hidden" name="riga_id" value="{{ riga.id }}">
-                <button type="submit" class="btn btn-sm" style="background-color: var(--color-accent); color:#fff;">✅ Consegnato</button>
+                <button type="submit" class="btn btn-azione btn-sm" style="background-color: var(--color-accent); color:#fff;">✅ Consegnato</button>
               </form>
             </td>
           </tr>
@@ -173,23 +173,23 @@
               {% csrf_token %}
               <input type="hidden" name="azione" value="via_libera_riga">
               <input type="hidden" name="riga_id" value="{{ riga.id }}">
-              <button type="submit" class="btn btn-sm" style="background-color: var(--color-in-cucina); color:#fff; font-weight:600;">
+              <button type="submit" class="btn btn-azione btn-sm" style="background-color: var(--color-in-cucina); color:#fff;">
                 🟢 Via libera
               </button>
             </form>
           {% elif riga.stato == "in_attesa" %}
-            <span class="badge" style="background-color: var(--color-verde-acceso);">👨‍🍳 In cucina</span>
+            <span class="badge badge-info" style="background-color: var(--color-verde-acceso);">👨‍🍳 In cucina</span>
           {% elif riga.stato == "pronto" %}
             <form method="post">
               {% csrf_token %}
               <input type="hidden" name="azione" value="consegnato">
               <input type="hidden" name="riga_id" value="{{ riga.id }}">
-              <button type="submit" class="btn btn-sm" style="background-color: var(--color-accent); color:#fff; font-weight:600;">
+              <button type="submit" class="btn btn-azione btn-sm" style="background-color: var(--color-accent); color:#fff;">
                 🔔 Pronto — consegna
               </button>
             </form>
           {% else %}
-            <span class="badge" style="background-color: var(--color-primary);">Servito</span>
+            <span class="badge badge-info" style="background-color: var(--color-primary);">Servito</span>
           {% endif %}
         </td>
         <td class="text-end">

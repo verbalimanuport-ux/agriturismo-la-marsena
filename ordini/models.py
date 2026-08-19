@@ -1,9 +1,13 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
 from menu_digitale.models import ImpostazioniMenu, Piatto
 from prenotazioni.models import Prenotazione, Tavolo
+
+SOGLIA_APPENA_SERVITO = timedelta(minutes=4)
 
 
 class Ordine(models.Model):
@@ -148,8 +152,8 @@ class Ordine(models.Model):
 
     @property
     def stato_sala(self):
-        """Stato sintetico a 4 valori per colorare il tavolo in Sala/Cucina/
-        Mappa (il quinto colore, 'libero', si applica quando non c'è nessun
+        """Stato sintetico a 6 valori per colorare il tavolo in Sala/Cucina/
+        Mappa (il settimo colore, 'libero', si applica quando non c'è nessun
         ordine aperto — non serve calcolarlo qui, lo decide chi chiama)."""
         righe = list(self.righe.all())
         if not righe:
@@ -158,6 +162,18 @@ class Ordine(models.Model):
             return "pronto"
         if all(r.stato == RigaOrdine.STATO_SERVITO for r in righe):
             return "completo"
+        adesso = timezone.now()
+        appena_servite = any(
+            r.stato == RigaOrdine.STATO_SERVITO
+            and r.servita_il
+            and (adesso - r.servita_il) < SOGLIA_APPENA_SERVITO
+            for r in righe
+        )
+        if appena_servite:
+            # Qualcosa è stato consegnato da pochi minuti, e non c'è altro di
+            # più urgente in questo momento: un colore dedicato, temporaneo,
+            # per confermare "consegna riuscita" invece di sparire nel nulla.
+            return "appena_servito"
         if any(r.stato in (RigaOrdine.STATO_PREVISTO, RigaOrdine.STATO_IN_ATTESA) for r in righe):
             return "in_cucina"
         return "in_attesa_ordini"  # tutto ancora in bozza, non ancora inviato
@@ -255,6 +271,12 @@ class RigaOrdine(models.Model):
         blank=True,
         verbose_name="Inviata in cucina il",
         help_text="Da qui parte il conteggio del tempo di attesa mostrato alla cucina.",
+    )
+    servita_il = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Servita il",
+        help_text="Usato per mostrare per qualche minuto il colore 'appena servito' in Sala.",
     )
 
     class Meta:

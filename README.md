@@ -737,7 +737,43 @@ cronometro, e compare il pulsante "✅ Pronto" — sempre riferito solo a quel p
 **Sulla pagina del tavolo**: ogni riga della tabella ha ora la sua colonna "Stato" con
 il pulsante giusto (Via libera / In cucina / Pronto — consegna / Servito).
 
-## 52. Prossimo passo
+## 53. Rifiniture dopo il primo test con più tavoli
+
+Nuova migrazione:
+
+```
+python manage.py migrate
+```
+
+### 🔥 Cucina riorganizzata in due zone — il cambio più importante
+Prima, ogni piatto (anche quelli ancora "in attesa del via libera") occupava una card
+grande quanto quelli davvero da cucinare — con tanti tavoli diventava un muro di scroll
+infinito. Ora:
+- **"🔥 Da cucinare ora"**: solo i piatti attivi (via libera già dato), grandi, ordinati dal
+  più vecchio al più recente — la vera coda di lavoro, di solito poche card anche a sala
+  piena
+- **"⏳ In arrivo"**: i piatti ancora "Previsti", raccolti in un elenco compatto **per
+  tavolo**, richiudibile (clicca sul nome del tavolo per aprire/chiudere) — restano
+  visibili per organizzarsi in anticipo, ma senza occupare lo schermo come prima
+
+### 🔊 Suono più forte e riconoscibile
+Volume al massimo, tono più "squillante" (onda quadra invece che morbida), ripetuto tre
+volte — pensato per un ambiente rumoroso.
+
+### 🎨 Nuovo colore "Appena servito"
+Quando un piatto viene consegnato, il tavolo mostra per **4 minuti** un colore dedicato
+(verde-acqua) in Sala, Mappa e nella striscia di Cucina — poi torna da solo allo stato
+normale. Conferma visiva che la consegna è andata a buon fine, senza dover scrivere nulla
+(lo spazio nei quadratini è troppo piccolo per il nome del piatto, e la lista ordini è già
+lì accanto per chi vuole il dettaglio).
+
+### 🔘 Pulsanti che sembrano davvero pulsanti
+I pulsanti d'azione (Via libera, Pronto, Consegnato, Invia in cucina) ora hanno un aspetto
+"in rilievo" (bordo/ombra, si "premono" visivamente al tocco) — chiaramente diversi dai
+badge informativi (Servito, In cucina), che restano piatti e senza ombra. A colpo d'occhio
+si distingue cosa richiede un tocco da cosa è solo da leggere.
+
+## 54. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.

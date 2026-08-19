@@ -323,7 +323,7 @@ def gestisci_tavolo(request, tavolo_id):
             riga_id = request.POST.get("riga_id")
             RigaOrdine.objects.filter(
                 id=riga_id, ordine=ordine, stato=RigaOrdine.STATO_PRONTO
-            ).update(stato=RigaOrdine.STATO_SERVITO)
+            ).update(stato=RigaOrdine.STATO_SERVITO, servita_il=timezone.now())
             messages.success(request, "Segnato come consegnato.")
         elif azione == "aggiorna_coperti":
             try:
@@ -407,17 +407,17 @@ def gestisci_tavolo(request, tavolo_id):
 
 @login_required
 def cucina(request):
-    """Vista per la cucina: cosa preparare, raggruppato per tavolo e per giro
-    (solo un'etichetta di orientamento — Antipasti, Primi... — non un'unità
-    di controllo) e per categoria che richiede cucina (vini/bibite/caffè non
-    compaiono mai qui). Include anche i piatti "Previsti" — inviati dal
-    cameriere ma non ancora avviati col via libera — per permettere di
-    organizzarsi in anticipo, mostrati però attenuati e senza pulsante, dato
-    che non si può ancora agire su di loro. Il via libera e il "Pronto" sono
-    SEMPRE per singolo piatto, mai per l'intero giro insieme: piatti diversi
-    nello stesso giro (es. due secondi diversi in un menù degustazione)
-    procedono in modo indipendente, uno può essere pronto mentre l'altro non
-    è ancora nemmeno partito."""
+    """Vista per la cucina, pensata per non dover scorrere avanti e indietro
+    anche con molti tavoli pieni: due zone separate.
+    - "Da cucinare ora": SOLO i piatti attivi (via libera già dato), grandi,
+      ordinati dal più vecchio al più recente — la coda di lavoro vera, di
+      solito pochi elementi anche a sala piena.
+    - "In arrivo": i piatti ancora "Previsti" (in attesa del via libera del
+      cameriere), raggruppati per tavolo in una lista compatta — utile per
+      organizzarsi in anticipo, ma senza occupare lo schermo come card grandi.
+    Il via libera e il "Pronto" sono sempre per singolo piatto, mai per
+    l'intero giro: piatti diversi nello stesso giro procedono in modo
+    indipendente (es. due secondi diversi in un menù degustazione)."""
     if request.method == "POST":
         riga_id = request.POST.get("riga_id")
         RigaOrdine.objects.filter(
@@ -432,13 +432,14 @@ def cucina(request):
             piatto__categoria__richiede_cucina=True,
         )
         .select_related("ordine__tavolo", "piatto__categoria", "inviato_da")
-        .order_by("ordine__aperto_il", "portata", "creata_il")
+        .order_by("portata", "creata_il")
     )
 
     adesso = timezone.now()
     soglia = ImpostazioniMenu.ottieni().soglia_ritardo_cucina_minuti or SOGLIA_ATTESA_MINUTI
-    tavoli_raggruppati = {}
-    conteggio_attivi = 0
+
+    attivi = []
+    previsti_per_tavolo = {}
     for riga in righe:
         if riga.stato == RigaOrdine.STATO_IN_ATTESA:
             # Il tempo di attesa parte da quando è arrivato il via libera, non
@@ -446,22 +447,25 @@ def cucina(request):
             riferimento = riga.inviata_il or riga.creata_il
             riga.minuti_attesa = int((adesso - riferimento).total_seconds() // 60)
             riga.in_ritardo = riga.minuti_attesa >= soglia
-            conteggio_attivi += 1
+            riga._ordinamento = riferimento
+            attivi.append(riga)
         else:
-            riga.minuti_attesa = None
-            riga.in_ritardo = False
-        tavolo = riga.ordine.tavolo
-        tavoli_raggruppati.setdefault(tavolo, []).append(riga)
+            previsti_per_tavolo.setdefault(riga.ordine.tavolo, []).append(riga)
+
+    # I più vecchi (più urgenti) per primi, indipendentemente dal tavolo — è
+    # la coda di lavoro vera del cuoco in questo momento.
+    attivi.sort(key=lambda r: r._ordinamento)
 
     return render(
         request,
         "ordini/cucina.html",
         {
-            "tavoli_raggruppati": tavoli_raggruppati.items(),
-            # Conta solo i giri già "chiamati" (In cucina), non quelli ancora
-            # Previsti: così il suono scatta quando il cameriere dà il via
-            # libera, non solo quando arriva un nuovo ordine.
-            "totale_in_attesa": conteggio_attivi,
+            "attivi": attivi,
+            "previsti_per_tavolo": previsti_per_tavolo.items(),
+            # Conta solo i piatti già "chiamati" (In cucina), non quelli
+            # ancora Previsti: così il suono scatta quando il cameriere dà il
+            # via libera, non solo quando arriva un nuovo ordine.
+            "totale_in_attesa": len(attivi),
             "riepilogo_sala": _riepilogo_tavoli(),
         },
     )

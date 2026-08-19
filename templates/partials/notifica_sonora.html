@@ -17,8 +17,12 @@
     function suonaAvviso() {
       try {
         var ctx = new (window.AudioContext || window.webkitAudioContext)();
-        suonaNota(ctx, 880, 0);
-        suonaNota(ctx, 1100, 0.18);
+        var t = 0;
+        for (var i = 0; i < 3; i++) {
+          suonaNota(ctx, 1046, t);
+          suonaNota(ctx, 1318, t + 0.16);
+          t += 0.42;
+        }
       } catch (e) {
         // Niente audio disponibile in questo momento: pazienza, non blocca nulla.
       }
@@ -29,14 +33,16 @@
       var gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.type = "sine";
+      // Onda quadra: più "squillante"/penetrante di una sinusoide morbida,
+      // si sente meglio in un ambiente rumoroso come una cucina.
+      osc.type = "square";
       var inizio = ctx.currentTime + ritardo;
       osc.frequency.setValueAtTime(frequenza, inizio);
       gain.gain.setValueAtTime(0.0001, inizio);
-      gain.gain.exponentialRampToValueAtTime(0.25, inizio + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, inizio + 0.4);
+      gain.gain.exponentialRampToValueAtTime(0.9, inizio + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, inizio + 0.15);
       osc.start(inizio);
-      osc.stop(inizio + 0.42);
+      osc.stop(inizio + 0.16);
     }
   })();
 </script>
