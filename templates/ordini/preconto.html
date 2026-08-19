@@ -61,7 +61,7 @@
       {% endif %}
       {% for riga in voci_singole %}
       <tr>
-        <td>{{ riga.piatto.nome }}</td>
+        <td>{{ riga.piatto.nome }}{% if riga.extra_a_pagamento %} <span class="text-muted small">(a pagamento)</span>{% endif %}</td>
         <td class="text-center" style="white-space:nowrap;">{{ riga.quantita }} ×</td>
         <td class="text-end" style="white-space:nowrap;">&euro;{{ riga.subtotale }}</td>
       </tr>

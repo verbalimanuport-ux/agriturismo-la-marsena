@@ -36,25 +36,21 @@
   <div class="mb-4"></div>
 {% endif %}
 
-<form method="post" class="row g-2 align-items-end mb-4">
-  {% csrf_token %}
-  <input type="hidden" name="azione" value="aggiungi">
-  <div class="col-md-5">
-    {{ form.piatto.label_tag }}
-    {{ form.piatto }}
-  </div>
-  <div class="col-md-2">
-    {{ form.quantita.label_tag }}
-    {{ form.quantita }}
-  </div>
-  <div class="col-md-3">
-    {{ form.note.label_tag }}
-    {{ form.note }}
-  </div>
-  <div class="col-md-2">
-    <button type="submit" class="btn btn-success w-100">Aggiungi</button>
-  </div>
-</form>
+<div class="d-flex gap-2 flex-wrap mb-4">
+  <button type="button" class="btn btn-azione btn-lg" style="background-color: var(--color-primary); color:#fff;" data-bs-toggle="modal" data-bs-target="#modaleCibo">
+    🍽️ Aggiungi cibo
+  </button>
+  <button type="button" class="btn btn-azione btn-lg" style="background-color: var(--color-in-attesa-ordini); color:#fff;" data-bs-toggle="modal" data-bs-target="#modaleBevande">
+    🥤 Aggiungi bevanda
+  </button>
+  <button type="button" class="btn btn-azione btn-lg" style="background-color: var(--color-accent); color:#fff;" data-bs-toggle="modal" data-bs-target="#modaleExtra">
+    ➕ Extra (a pagamento)
+  </button>
+</div>
+
+{% include "ordini/partials/modale_scelta_piatti.html" with id_modale="modaleCibo" titolo="🍽️ Aggiungi cibo" gruppi=piatti_cibo_gruppi azione_form="aggiungi_rapido" colore="var(--color-primary)" %}
+{% include "ordini/partials/modale_scelta_piatti.html" with id_modale="modaleBevande" titolo="🥤 Aggiungi bevanda" gruppi=piatti_bevande_gruppi azione_form="aggiungi_rapido" colore="var(--color-in-attesa-ordini)" %}
+{% include "ordini/partials/modale_scelta_piatti.html" with id_modale="modaleExtra" titolo="➕ Extra a pagamento" gruppi=piatti_cibo_gruppi azione_form="aggiungi_extra" colore="var(--color-accent)" nota_extra="Qualsiasi cosa aggiunta da qui si paga sempre a parte, anche con il menù fisso." %}
 
 {% if righe_bozza %}
   <form method="post" id="formInvio">
@@ -159,11 +155,11 @@
       {% for riga in giro.righe %}
       <tr style="{% if riga.stato == 'previsto' %}opacity:0.55;{% elif riga.stato == 'in_attesa' %}background-color: rgba(47,168,79,0.07);{% endif %}">
         <td>{{ riga.quantita }}</td>
-        <td>{{ riga.piatto.nome }}</td>
+        <td>{{ riga.piatto.nome }}{% if riga.extra_a_pagamento %} <span class="text-muted small">(a pagamento)</span>{% endif %}</td>
         <td>{{ riga.note|default:"—" }}</td>
         <td>{{ riga.inviato_da.username|default:riga.get_origine_display }}</td>
         <td>
-          {% if ordine.modalita_effettiva != "fisso" or riga.piatto.categoria.sempre_a_parte %}
+          {% if ordine.modalita_effettiva != "fisso" or riga.piatto.categoria.sempre_a_parte or riga.extra_a_pagamento %}
             &euro;{{ riga.subtotale }}
           {% endif %}
         </td>
@@ -270,6 +266,41 @@
         });
     });
   });
+})();
+</script>
+
+<script>
+// "Tocca e aggiungi": ogni bottone piatto nelle finestre Cibo/Bevande/Extra
+// invia in background e la finestra si riapre da sola, così si possono
+// toccare più piatti di fila senza doverla riaprire ogni volta a mano.
+(function () {
+  var token = document.querySelector('input[name=csrfmiddlewaretoken]').value;
+
+  document.querySelectorAll('#modaleCibo, #modaleBevande, #modaleExtra').forEach(function (finestra) {
+    finestra.addEventListener('shown.bs.modal', function () { window.pausaAutoRefresh = true; });
+    finestra.addEventListener('hidden.bs.modal', function () { window.pausaAutoRefresh = false; });
+  });
+
+  document.querySelectorAll('.form-aggiungi-rapido').forEach(function (modulo) {
+    modulo.addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      var finestra = modulo.closest('.modal');
+      if (finestra) { sessionStorage.setItem('modaleDaRiaprire', finestra.id); }
+      var dati = new FormData(modulo);
+      fetch(window.location.pathname, { method: 'POST', body: dati })
+        .then(function () { window.location.reload(); })
+        .catch(function () { window.location.reload(); });
+    });
+  });
+
+  var daRiaprire = sessionStorage.getItem('modaleDaRiaprire');
+  if (daRiaprire) {
+    sessionStorage.removeItem('modaleDaRiaprire');
+    var elemento = document.getElementById(daRiaprire);
+    if (elemento && window.bootstrap) {
+      new bootstrap.Modal(elemento).show();
+    }
+  }
 })();
 </script>
 {% endblock %}
