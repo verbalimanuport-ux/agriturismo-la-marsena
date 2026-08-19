@@ -55,7 +55,7 @@
               <img src="{{ piatto.immagine.url }}" alt="{{ piatto.nome }}" width="46" height="46" class="rounded-circle me-3 flex-shrink-0" style="object-fit:cover;">
             {% endif %}
             <span class="fw-semibold" style="font-family:'Fraunces',serif; font-size:1.1rem;">{{ piatto.nome }}</span>
-            {% if menu_attivo.modalita_attiva != "fisso" or piatto.tipo_menu != "fisso" %}
+            {% if menu_attivo.modalita_attiva != "fisso" or piatto.categoria.sempre_a_parte %}
               <span class="flex-grow-1 mx-2" style="border-bottom: 1px dotted var(--color-border); transform: translateY(-5px);"></span>
               <span class="flex-shrink-0 fw-semibold" style="color: var(--color-accent); background-color: var(--color-accent-soft); padding: 0.15rem 0.65rem; border-radius: 999px; font-size: 0.92rem;">&euro;{{ piatto.prezzo }}</span>
             {% endif %}

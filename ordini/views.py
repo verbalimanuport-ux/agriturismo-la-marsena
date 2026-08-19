@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from menu_digitale.models import Categoria, ImpostazioniMenu, Menu, Piatto, PiattoMenu, categorie_con_piatti_per_menu
+from menu_digitale.models import Categoria, ImpostazioniMenu, Menu, Piatto, categorie_con_piatti_per_menu
 from prenotazioni.models import LayoutSala, Tavolo
 
 from .forms import AggiungiPiattoForm
@@ -70,12 +70,11 @@ def _genera_portate_standard_se_fisso(ordine, utente):
     if menu_di_riferimento is None:
         return
 
-    collegamenti_fissi = PiattoMenu.objects.filter(
-        menu=menu_di_riferimento, tipo_menu=Piatto.TIPO_FISSO, piatto__disponibile=True
-    ).select_related("piatto__categoria")
+    piatti_fissi = Piatto.objects.filter(
+        menus=menu_di_riferimento, disponibile=True, categoria__sempre_a_parte=False
+    ).select_related("categoria")
 
-    for collegamento in collegamenti_fissi:
-        piatto = collegamento.piatto
+    for piatto in piatti_fissi:
         riga = ordine.righe.filter(piatto=piatto).first()
         if riga is None:
             RigaOrdine.objects.create(
@@ -86,7 +85,6 @@ def _genera_portate_standard_se_fisso(ordine, utente):
                 origine=RigaOrdine.ORIGINE_STAFF,
                 inviato_da=utente,
                 stato=RigaOrdine.STATO_BOZZA,
-                tipo_menu_applicato=Piatto.TIPO_FISSO,
             )
         elif riga.quantita < ordine.numero_coperti:
             riga.quantita = ordine.numero_coperti
@@ -130,7 +128,6 @@ def ordina_tavolo(request, numero_tavolo):
                 origine=RigaOrdine.ORIGINE_CLIENTE,
                 portata=piatto.categoria.ordine or 1,
                 stato=RigaOrdine.STATO_BOZZA,
-                tipo_menu_applicato=RigaOrdine.tipo_menu_per(piatto, ordine),
             )
             messages.success(request, "Richiesta ricevuta! Il cameriere la invierà a breve.")
             return redirect("ordini:ordina_tavolo", numero_tavolo=numero_tavolo)
@@ -227,7 +224,6 @@ def gestisci_tavolo(request, tavolo_id):
                     inviato_da=request.user,
                     portata=piatto.categoria.ordine or 1,
                     stato=RigaOrdine.STATO_BOZZA,
-                    tipo_menu_applicato=RigaOrdine.tipo_menu_per(piatto, ordine),
                 )
                 messages.success(request, f"{piatto.nome} aggiunto — premi \"Invia in cucina\" quando hai finito.")
         elif azione == "rimuovi":
@@ -601,7 +597,7 @@ def preconto(request, ordine_id):
     voci_singole = []
     coperti_menu_fisso = 0
     for r in righe:
-        if modalita_fissa and r.tipo_menu_applicato == Piatto.TIPO_FISSO:
+        if modalita_fissa and not r.piatto.categoria.sempre_a_parte:
             coperti_menu_fisso = ordine.numero_coperti
             continue
         voci_singole.append(r)
@@ -616,7 +612,10 @@ def preconto(request, ordine_id):
     quota = (totale / dividi_per) if dividi_per else totale
 
     # Dati per il calcolatore "Alla romana": disponibile solo in modalità
-    # "solo carta" (nel fisso non ha senso, si mangia tutti uguale).
+    # "solo carta" (nel fisso non ha senso, si mangia tutti uguale). Tutto
+    # passa da json.dumps, MAI interpolato direttamente nel codice JS: con
+    # LANGUAGE_CODE italiano, Django scriverebbe i decimali con la virgola
+    # (es. "3,50"), che spacca la sintassi JavaScript.
     voci_romana = [
         {
             "id": r.id,
@@ -626,6 +625,10 @@ def preconto(request, ordine_id):
         }
         for r in voci_singole
     ]
+    dati_romana = {
+        "voci": voci_romana,
+        "coperto_persona": float(ImpostazioniMenu.ottieni().prezzo_coperto) if totale_coperto else 0,
+    }
 
     return render(
         request,
@@ -641,8 +644,7 @@ def preconto(request, ordine_id):
             "dividi_per": dividi_per,
             "quota": quota,
             "modalita_solo_carta": modalita_solo_carta,
-            "voci_romana_json": json.dumps(voci_romana),
-            "coperto_per_persona": float(ImpostazioniMenu.ottieni().prezzo_coperto) if totale_coperto else 0,
+            "dati_romana_json": json.dumps(dati_romana),
             "adesso": timezone.now(),
         },
     )

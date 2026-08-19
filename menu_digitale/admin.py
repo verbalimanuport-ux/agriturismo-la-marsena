@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Categoria, ImpostazioniMenu, Menu, Piatto, PiattoMenu
+from .models import Categoria, ImpostazioniMenu, Menu, Piatto
 
 
 @admin.register(Menu)
@@ -9,20 +9,15 @@ class MenuAdmin(admin.ModelAdmin):
     list_editable = ("attivo", "modalita_attiva", "prezzo_menu_fisso_a_persona", "data_inizio", "data_fine")
     list_filter = ("attivo", "modalita_attiva")
     search_fields = ("nome", "descrizione")
+    # Doppia colonna con checkbox: a sinistra tutti i piatti disponibili, a
+    # destra quelli già scelti per questo menù — cerca e sposta con un clic.
+    filter_horizontal = ("piatti",)
 
 
 @admin.register(Categoria)
 class CategoriaAdmin(admin.ModelAdmin):
-    list_display = ("nome", "richiede_cucina", "ordine")
-    list_editable = ("richiede_cucina", "ordine")
-
-
-class PiattoMenuInline(admin.TabularInline):
-    model = PiattoMenu
-    extra = 1
-    fields = ("menu", "tipo_menu")
-    verbose_name = "Presenza in un menù"
-    verbose_name_plural = "In quali menù compare, e con che tipo in ciascuno"
+    list_display = ("nome", "richiede_cucina", "sempre_a_parte", "ordine")
+    list_editable = ("richiede_cucina", "sempre_a_parte", "ordine")
 
 
 @admin.register(Piatto)
@@ -31,15 +26,6 @@ class PiattoAdmin(admin.ModelAdmin):
     list_editable = ("prezzo", "disponibile", "ordine")
     list_filter = ("categoria", "disponibile", "menus")
     search_fields = ("nome", "descrizione", "allergeni")
-    inlines = [PiattoMenuInline]
-
-
-@admin.register(PiattoMenu)
-class PiattoMenuAdmin(admin.ModelAdmin):
-    list_display = ("piatto", "menu", "tipo_menu")
-    list_editable = ("tipo_menu",)
-    list_filter = ("menu", "tipo_menu")
-    search_fields = ("piatto__nome",)
 
 
 @admin.register(ImpostazioniMenu)

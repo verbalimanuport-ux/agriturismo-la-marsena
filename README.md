@@ -856,7 +856,37 @@ tipo di un piatto dopo, i conti già aperti non cambiano.
 - Nelle Impostazioni generali, il campo del prezzo del coperto **compare solo quando
   spunti "Applica il coperto"**, per non fare confusione
 
-## 58. Prossimo passo
+## 59. Semplificazione: niente più "tipo" da scegliere piatto per piatto
+
+⚠️ **Cinque nuove migrazioni** (tre su menu_digitale, due su ordini) — questa volta il
+cambiamento va nella direzione di **togliere** complessità, non aggiungerla:
+
+```
+python manage.py migrate
+```
+
+Il flusso per creare un nuovo menù ora è quello più semplice che ci si aspetterebbe:
+
+1. **Categorie** (Antipasti, Primi, Secondi, Vini...) — condivise, create una volta sola,
+   invariato
+2. **Piatti** — assegni la categoria, invariato. **Niente più "tipo" da scegliere**: quello
+   è sparito del tutto
+3. **Crei un Menù** — scegli il nome, se è **fisso o alla carta**, e poi (da
+   `/admin/menu_digitale/menu/`) trovi un **elenco a doppia colonna con checkbox**: a
+   sinistra tutti i piatti disponibili, a destra quelli scelti per questo menù — sposti con
+   un clic o cerchi per nome
+
+Il tipo di ogni piatto **lo eredita in automatico dal Menù in cui lo metti**: se il menù è
+fisso, quel piatto lì dentro è fisso; se è alla carta, è alla carta. Lo stesso piatto può
+stare in più menù contemporaneamente, anche con comportamento diverso in ciascuno, senza
+nessuna selezione in più.
+
+**L'unica eccezione**: Vini/Bibite/Caffè, che devono restare sempre a prezzo singolo anche
+in un menù fisso. Ora è un interruttore sulla **Categoria** (non più sul piatto):
+`/admin/menu_digitale/categoria/` → spunta **"Sempre a prezzo singolo"** per quella
+categoria, una volta sola, vale per tutti i menù.
+
+## 60. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.

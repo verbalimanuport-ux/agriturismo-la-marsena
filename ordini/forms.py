@@ -23,13 +23,12 @@ class AggiungiPiattoForm(forms.Form):
 
     def __init__(self, *args, solo_extra=False, **kwargs):
         super().__init__(*args, **kwargs)
-        # Solo i piatti disponibili e del tipo di menù attualmente attivo
-        # (fisso, carta, o sempre visibile), scelto piatto per piatto.
+        # Tutti i piatti spuntati per il menù attualmente attivo.
         if solo_extra:
             # Usato per il cliente da QR quando è attivo il menù fisso: le
             # portate del menù sono automatiche, il cliente ordina solo gli
-            # extra (es. bevande) sempre visibili.
-            piatti_qs = Piatto.attivi(solo_tipo=Piatto.TIPO_SEMPRE).select_related("categoria")
+            # extra (es. bevande) delle categorie "sempre a parte".
+            piatti_qs = Piatto.attivi(solo_sempre_a_parte=True).select_related("categoria")
         else:
             piatti_qs = Piatto.attivi().select_related("categoria")
         self.fields["piatto"].queryset = piatti_qs

@@ -108,11 +108,12 @@
 </style>
 
 {% if modalita_solo_carta %}
-<script id="datiVociRomana" type="application/json">{{ voci_romana_json|safe }}</script>
+<script id="datiVociRomana" type="application/json">{{ dati_romana_json|safe }}</script>
 <script>
 (function () {
-  var voci = JSON.parse(document.getElementById('datiVociRomana').textContent);
-  var copertoPersona = {{ coperto_per_persona|default:0 }};
+  var dati = JSON.parse(document.getElementById('datiVociRomana').textContent);
+  var voci = dati.voci;
+  var copertoPersona = dati.coperto_persona;
   var persone = [];
   var contatore = 0;
 
