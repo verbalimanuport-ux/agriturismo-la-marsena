@@ -41,6 +41,11 @@
           {% else %}
             <span class="badge badge-info" style="background-color: var(--color-libero);">Libero</span>
           {% endif %}
+          {% if dato.bevande_da_servire %}
+            <span class="badge d-block mt-1 badge-info" style="background-color: var(--color-in-attesa-ordini);">🥤 da servire</span>
+          {% elif dato.bevande_servite %}
+            <span class="badge d-block mt-1 badge-info" style="background-color: var(--color-appena-servito);">🥤 servite</span>
+          {% endif %}
         </div>
       </div>
     </a>
