@@ -46,7 +46,7 @@
       <td>{{ riga.piatto.nome }}</td>
       <td>{{ riga.note|default:"—" }}</td>
       <td>
-        {% if ordine.modalita_effettiva != "fisso" or riga.piatto.tipo_menu != "fisso" %}
+        {% if ordine.modalita_effettiva != "fisso" or riga.tipo_menu_applicato != "fisso" %}
           &euro;{{ riga.subtotale }}
         {% endif %}
       </td>

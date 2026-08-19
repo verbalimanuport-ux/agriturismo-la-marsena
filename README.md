@@ -822,7 +822,41 @@ piatto tocca a ciascuno — il subtotale (coperto compreso) si calcola da solo i
 reale. Nessuna modifica al database: è solo uno strumento al momento del conto, il modo
 di ordinare resta identico a sempre.
 
-## 56. Prossimo passo
+## 57. Correzione: Categorie condivise, Piatti in più menù, e bug del coperto
+
+⚠️ **Tre nuove migrazioni**, un'altra ristrutturazione dei dati:
+
+```
+python manage.py migrate
+```
+
+La migrazione dati unisce automaticamente eventuali categorie doppie con lo stesso nome
+create per menù diversi (es. due "Antipasti" separate), spostando tutti i piatti sulla
+categoria superstite — non serve alcun intervento manuale.
+
+### 🗂️ Categorie di nuovo condivise
+Le categorie (Antipasti, Primi, Secondi, Dolci...) sono di nuovo **globali**, create una
+volta sola — coerente con come funziona davvero un menù: la struttura resta la stessa,
+cambiano solo i piatti.
+
+### 🍽️ Un piatto può stare in più menù, con tipo diverso in ciascuno
+Ogni Piatto (nome, prezzo, descrizione — **sempre gli stessi ovunque**) può ora essere
+collegato a **più edizioni di Menù contemporaneamente**, e in **ognuna può avere un tipo
+diverso** (fisso in un'edizione, alla carta in un'altra) — utile per non dover ricreare lo
+stesso piatto più volte. Nella scheda del Piatto su /admin/, in basso trovi la sezione "In
+quali menù compare, e con che tipo in ciascuno" per gestirlo.
+
+**Protezione anti-errore** (stesso principio di prezzo/modalità): il tipo di un piatto
+viene **congelato quando finisce nel conto**, non ricalcolato dal vivo — se cambiate il
+tipo di un piatto dopo, i conti già aperti non cambiano.
+
+### 🍞 Corretti due problemi sul coperto
+- Il coperto ora compare correttamente anche nel menù **alla carta/entrambi visibili**
+  (prima si vedeva solo nel fisso — bug confermato e sistemato)
+- Nelle Impostazioni generali, il campo del prezzo del coperto **compare solo quando
+  spunti "Applica il coperto"**, per non fare confusione
+
+## 58. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.

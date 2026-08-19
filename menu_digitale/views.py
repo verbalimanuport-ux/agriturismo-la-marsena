@@ -1,10 +1,9 @@
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Prefetch
 from django.shortcuts import redirect, render
 
-from .models import Categoria, ImpostazioniMenu, Menu, Piatto
+from .models import ImpostazioniMenu, Menu, categorie_con_piatti_per_menu
 
 
 def menu_pubblico(request):
@@ -12,13 +11,7 @@ def menu_pubblico(request):
     ATTIVO in questo momento (quello scelto a mano dallo staff)."""
     menu_attivo = Menu.ottieni_attivo()
     impostazioni = ImpostazioniMenu.ottieni()
-    categorie = []
-    if menu_attivo is not None:
-        piatti_attivi_qs = Piatto.attivi().order_by("ordine", "nome")
-        tutte_le_categorie = Categoria.objects.filter(menu=menu_attivo).prefetch_related(
-            Prefetch("piatti", queryset=piatti_attivi_qs, to_attr="piatti_attivi")
-        ).order_by("ordine", "nome")
-        categorie = [c for c in tutte_le_categorie if c.piatti_attivi]
+    categorie = categorie_con_piatti_per_menu(menu_attivo)
     return render(
         request,
         "menu_digitale/menu.html",

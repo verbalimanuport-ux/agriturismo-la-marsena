@@ -2,13 +2,13 @@ import json
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Prefetch
+from django.db.models import Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from menu_digitale.models import Categoria, ImpostazioniMenu, Menu, Piatto
+from menu_digitale.models import Categoria, ImpostazioniMenu, Menu, Piatto, PiattoMenu, categorie_con_piatti_per_menu
 from prenotazioni.models import LayoutSala, Tavolo
 
 from .forms import AggiungiPiattoForm
@@ -70,11 +70,12 @@ def _genera_portate_standard_se_fisso(ordine, utente):
     if menu_di_riferimento is None:
         return
 
-    piatti_fissi = Piatto.objects.filter(
-        tipo_menu=Piatto.TIPO_FISSO, disponibile=True, categoria__menu=menu_di_riferimento
-    ).select_related("categoria")
+    collegamenti_fissi = PiattoMenu.objects.filter(
+        menu=menu_di_riferimento, tipo_menu=Piatto.TIPO_FISSO, piatto__disponibile=True
+    ).select_related("piatto__categoria")
 
-    for piatto in piatti_fissi:
+    for collegamento in collegamenti_fissi:
+        piatto = collegamento.piatto
         riga = ordine.righe.filter(piatto=piatto).first()
         if riga is None:
             RigaOrdine.objects.create(
@@ -85,6 +86,7 @@ def _genera_portate_standard_se_fisso(ordine, utente):
                 origine=RigaOrdine.ORIGINE_STAFF,
                 inviato_da=utente,
                 stato=RigaOrdine.STATO_BOZZA,
+                tipo_menu_applicato=Piatto.TIPO_FISSO,
             )
         elif riga.quantita < ordine.numero_coperti:
             riga.quantita = ordine.numero_coperti
@@ -106,13 +108,7 @@ def ordina_tavolo(request, numero_tavolo):
     menu_attivo = Menu.ottieni_attivo()
 
     if not impostazioni.ordini_qr_abilitati:
-        categorie = []
-        if menu_attivo is not None:
-            piatti_attivi_qs = Piatto.attivi().order_by("ordine", "nome")
-            tutte_le_categorie = Categoria.objects.filter(menu=menu_attivo).prefetch_related(
-                Prefetch("piatti", queryset=piatti_attivi_qs, to_attr="piatti_attivi")
-            ).order_by("ordine", "nome")
-            categorie = [c for c in tutte_le_categorie if c.piatti_attivi]
+        categorie = categorie_con_piatti_per_menu(menu_attivo)
         return render(
             request,
             "ordini/solo_menu_tavolo.html",
@@ -134,6 +130,7 @@ def ordina_tavolo(request, numero_tavolo):
                 origine=RigaOrdine.ORIGINE_CLIENTE,
                 portata=piatto.categoria.ordine or 1,
                 stato=RigaOrdine.STATO_BOZZA,
+                tipo_menu_applicato=RigaOrdine.tipo_menu_per(piatto, ordine),
             )
             messages.success(request, "Richiesta ricevuta! Il cameriere la invierà a breve.")
             return redirect("ordini:ordina_tavolo", numero_tavolo=numero_tavolo)
@@ -230,6 +227,7 @@ def gestisci_tavolo(request, tavolo_id):
                     inviato_da=request.user,
                     portata=piatto.categoria.ordine or 1,
                     stato=RigaOrdine.STATO_BOZZA,
+                    tipo_menu_applicato=RigaOrdine.tipo_menu_per(piatto, ordine),
                 )
                 messages.success(request, f"{piatto.nome} aggiunto — premi \"Invia in cucina\" quando hai finito.")
         elif azione == "rimuovi":
@@ -603,7 +601,7 @@ def preconto(request, ordine_id):
     voci_singole = []
     coperti_menu_fisso = 0
     for r in righe:
-        if modalita_fissa and r.piatto.tipo_menu == Piatto.TIPO_FISSO:
+        if modalita_fissa and r.tipo_menu_applicato == Piatto.TIPO_FISSO:
             coperti_menu_fisso = ordine.numero_coperti
             continue
         voci_singole.append(r)

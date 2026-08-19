@@ -26,6 +26,10 @@
         Menù fisso: &euro;{{ menu_attivo.prezzo_menu_fisso_a_persona }} a persona
         {% if impostazioni.coperto_attivo %}<br><span class="small fw-normal">Coperto incluso</span>{% endif %}
       </div>
+    {% elif impostazioni.coperto_attivo and impostazioni.prezzo_coperto > 0 %}
+      <div class="text-center p-3 mb-5" style="background-color: var(--color-bg); border-radius: var(--radius-md); color: var(--color-muted); font-weight: 600;">
+        Coperto: &euro;{{ impostazioni.prezzo_coperto }} a persona
+      </div>
     {% endif %}
 
     {% for categoria in categorie %}

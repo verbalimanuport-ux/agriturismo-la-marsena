@@ -69,16 +69,12 @@ class Menu(models.Model):
 
 
 class Categoria(models.Model):
-    """Es. Antipasti, Primi, Secondi, Dolci, Vini... appartiene sempre a un
-    Menù specifico. L'ordine di visualizzazione è liberamente modificabile
-    dallo staff. La categoria è solo un raggruppamento: la scelta menù
-    fisso/carta/sempre visibile si fa sul singolo Piatto, non qui (una stessa
-    categoria "Primi" può contenere sia piatti del menù fisso sia piatti
-    disponibili solo alla carta)."""
+    """Es. Antipasti, Primi, Secondi, Dolci, Vini... CONDIVISA tra tutti i
+    menù: la struttura (che categorie esistono) è sempre la stessa, non
+    serve ricrearla per ogni nuova edizione — cambiano solo i piatti dentro.
+    Se un'edizione non ha piatti in una categoria, semplicemente quella
+    categoria non compare per quell'edizione."""
 
-    menu = models.ForeignKey(
-        Menu, on_delete=models.CASCADE, related_name="categorie", verbose_name="Menù"
-    )
     nome = models.CharField(max_length=100, verbose_name="Nome categoria")
     ordine = models.PositiveIntegerField(default=0, verbose_name="Ordine di visualizzazione")
     richiede_cucina = models.BooleanField(
@@ -94,10 +90,10 @@ class Categoria(models.Model):
     class Meta:
         verbose_name = "Categoria"
         verbose_name_plural = "Categorie"
-        ordering = ["menu", "ordine", "nome"]
+        ordering = ["ordine", "nome"]
 
     def __str__(self):
-        return f"{self.nome} ({self.menu.nome})"
+        return self.nome
 
 
 class ImpostazioniMenu(models.Model):
@@ -151,10 +147,12 @@ class ImpostazioniMenu(models.Model):
 
 
 class Piatto(models.Model):
-    """Un piatto (o vino/bevanda), sempre dentro una Categoria (e quindi
-    dentro un Menù). La scelta se fa parte del menù fisso, della carta, o se
-    è sempre visibile, si fa qui: due piatti della stessa Categoria (es.
-    entrambi "Primi") possono avere un Tipo di menù diverso."""
+    """Un piatto (o vino/bevanda). Nome, descrizione, prezzo, foto sono
+    UNICI — non cambiano mai da un menù all'altro, anche se lo stesso piatto
+    compare in più edizioni. In QUALI menù compare, e con che "tipo"
+    (fisso/carta/sempre) in ciascuno, si decide nella tabella PiattoMenu qui
+    sotto: lo stesso piatto può essere 'fisso' in un'edizione e 'carta' in
+    un'altra, restando un unico piatto con un unico prezzo."""
 
     TIPO_FISSO = "fisso"
     TIPO_CARTA = "carta"
@@ -171,15 +169,19 @@ class Piatto(models.Model):
     nome = models.CharField(max_length=150, verbose_name="Nome piatto")
     descrizione = models.TextField(blank=True, verbose_name="Descrizione")
     prezzo = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="Prezzo (EUR)")
-    tipo_menu = models.CharField(
-        max_length=10, choices=TIPO_CHOICES, default=TIPO_CARTA, verbose_name="Tipo di menù"
-    )
     allergeni = models.CharField(max_length=200, blank=True, verbose_name="Allergeni")
     immagine = models.ImageField(
         upload_to="piatti/", blank=True, null=True, verbose_name="Foto piatto"
     )
     disponibile = models.BooleanField(default=True, verbose_name="Disponibile")
     ordine = models.PositiveIntegerField(default=0, verbose_name="Ordine di visualizzazione")
+    menus = models.ManyToManyField(
+        Menu,
+        through="PiattoMenu",
+        related_name="piatti",
+        verbose_name="Presente nei menù",
+        blank=True,
+    )
 
     class Meta:
         verbose_name = "Piatto"
@@ -190,18 +192,82 @@ class Piatto(models.Model):
         return f"{self.nome} - EUR {self.prezzo}"
 
     @classmethod
-    def attivi(cls):
-        """Restituisce i piatti disponibili da mostrare ora, del Menù
-        ATTIVO: quelli del tipo di menù attualmente attivo (fisso o carta),
-        più quelli sempre visibili (es. vini/bevande). Se la modalità del
-        menù attivo è 'entrambi', li restituisce tutti. Se non c'è nessun
-        menù attivo, non restituisce nulla."""
+    def attivi(cls, solo_tipo=None):
+        """Restituisce (come QuerySet vero, utilizzabile in form/Prefetch)
+        i piatti disponibili da mostrare ora, del Menù ATTIVO: quelli del
+        tipo di menù attualmente attivo (fisso o carta), più quelli sempre
+        visibili (es. vini/bevande) — salvo che si chieda esplicitamente
+        solo un tipo con `solo_tipo`. Se la modalità del menù attivo è
+        'entrambi', li restituisce tutti (a meno di `solo_tipo`). Se non
+        c'è nessun menù attivo, non restituisce nulla."""
         menu_attivo = Menu.ottieni_attivo()
         if menu_attivo is None:
             return cls.objects.none()
-        qs = cls.objects.filter(disponibile=True, categoria__menu=menu_attivo)
-        if menu_attivo.modalita_attiva == Menu.MODALITA_ENTRAMBI:
-            return qs
-        return qs.filter(
-            models.Q(tipo_menu=menu_attivo.modalita_attiva) | models.Q(tipo_menu=cls.TIPO_SEMPRE)
+        collegamenti = PiattoMenu.objects.filter(menu=menu_attivo, piatto__disponibile=True)
+        if solo_tipo:
+            collegamenti = collegamenti.filter(tipo_menu=solo_tipo)
+        elif menu_attivo.modalita_attiva != Menu.MODALITA_ENTRAMBI:
+            collegamenti = collegamenti.filter(
+                models.Q(tipo_menu=menu_attivo.modalita_attiva) | models.Q(tipo_menu=cls.TIPO_SEMPRE)
+            )
+        id_piatti = collegamenti.values_list("piatto_id", flat=True)
+        return cls.objects.filter(id__in=id_piatti, disponibile=True)
+
+
+class PiattoMenu(models.Model):
+    """Collega un Piatto a un Menù, con il "tipo" (fisso/carta/sempre) che
+    ha SOLO in quella specifica edizione — lo stesso piatto può essere
+    'fisso' nel Menù Principale e 'carta' nel Menù d'Inverno."""
+
+    piatto = models.ForeignKey(
+        Piatto, on_delete=models.CASCADE, related_name="presenze", verbose_name="Piatto"
+    )
+    menu = models.ForeignKey(
+        Menu, on_delete=models.CASCADE, related_name="presenze_piatti", verbose_name="Menù"
+    )
+    tipo_menu = models.CharField(
+        max_length=10,
+        choices=Piatto.TIPO_CHOICES,
+        default=Piatto.TIPO_CARTA,
+        verbose_name="Tipo in questo menù",
+    )
+
+    class Meta:
+        verbose_name = "Presenza piatto nel menù"
+        verbose_name_plural = "Presenze piatti nei menù"
+        constraints = [
+            models.UniqueConstraint(fields=["piatto", "menu"], name="unico_piatto_per_menu")
+        ]
+
+    def __str__(self):
+        return f"{self.piatto.nome} in {self.menu.nome} ({self.get_tipo_menu_display()})"
+
+
+def categorie_con_piatti_per_menu(menu):
+    """Le categorie che hanno almeno un piatto attivo in QUESTO menù,
+    ciascuna con l'elenco dei suoi piatti (attributo `piatti_attivi`).
+    Ogni piatto porta con sé il proprio `tipo_menu` PER QUESTA EDIZIONE
+    (attributo Python dinamico, non salvato sul piatto — dipende dal menù,
+    non è un campo fisso). Usata sia dal menù pubblico sia dalla pagina
+    QR in sola consultazione, per non ripetere la stessa logica due volte."""
+    if menu is None:
+        return []
+    collegamenti = PiattoMenu.objects.filter(
+        menu=menu, piatto__disponibile=True
+    ).select_related("piatto__categoria")
+    if menu.modalita_attiva != Menu.MODALITA_ENTRAMBI:
+        collegamenti = collegamenti.filter(
+            models.Q(tipo_menu=menu.modalita_attiva) | models.Q(tipo_menu=Piatto.TIPO_SEMPRE)
         )
+    mappa = {}
+    for link in collegamenti:
+        piatto = link.piatto
+        piatto.tipo_menu = link.tipo_menu
+        voce = mappa.setdefault(piatto.categoria_id, {"categoria": piatto.categoria, "piatti": []})
+        voce["piatti"].append(piatto)
+    categorie = []
+    for voce in mappa.values():
+        voce["categoria"].piatti_attivi = sorted(voce["piatti"], key=lambda p: (p.ordine, p.nome))
+        categorie.append(voce["categoria"])
+    categorie.sort(key=lambda c: (c.ordine, c.nome))
+    return categorie

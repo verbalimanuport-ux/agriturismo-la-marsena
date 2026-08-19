@@ -159,10 +159,10 @@ class Ordine(models.Model):
             # Modalità "Solo menù fisso": i piatti fissi entrano nel calcolo a
             # persona, tutto il resto (carta/sempre visibile) a prezzo singolo.
             totale_a_prezzo_singolo = sum(
-                (r.subtotale for r in righe if r.piatto.tipo_menu != Piatto.TIPO_FISSO),
+                (r.subtotale for r in righe if r.tipo_menu_applicato != Piatto.TIPO_FISSO),
                 start=0,
             )
-            ha_piatti_fissi = any(r.piatto.tipo_menu == Piatto.TIPO_FISSO for r in righe)
+            ha_piatti_fissi = any(r.tipo_menu_applicato == Piatto.TIPO_FISSO for r in righe)
             totale_fisso = 0
             if ha_piatti_fissi:
                 totale_fisso = self.numero_coperti * self.prezzo_fisso_effettivo
@@ -334,6 +334,17 @@ class RigaOrdine(models.Model):
         verbose_name="Servita il",
         help_text="Usato per mostrare per qualche minuto il colore 'appena servito' in Sala.",
     )
+    tipo_menu_applicato = models.CharField(
+        max_length=10,
+        choices=Piatto.TIPO_CHOICES,
+        default=Piatto.TIPO_CARTA,
+        verbose_name="Tipo di menù applicato",
+        help_text=(
+            "Congelato quando il piatto è stato aggiunto al conto (lo stesso piatto può "
+            "essere 'fisso' in un menù e 'carta' in un altro): se cambia dopo, questo "
+            "conto non cambia."
+        ),
+    )
 
     class Meta:
         verbose_name = "Riga ordine"
@@ -346,6 +357,20 @@ class RigaOrdine(models.Model):
     @property
     def subtotale(self):
         return self.quantita * self.prezzo_unitario
+
+    @staticmethod
+    def tipo_menu_per(piatto, ordine):
+        """Il tipo (fisso/carta/sempre) di questo piatto NEL MENÙ collegato
+        a questo tavolo — lo stesso piatto può avere un tipo diverso in
+        un'altra edizione. Se il collegamento non esiste (piatto non
+        presente in quel menù, caso raro/di emergenza), ricade su 'carta'."""
+        from menu_digitale.models import PiattoMenu
+
+        menu_di_riferimento = ordine.menu_applicato or Menu.ottieni_attivo()
+        if menu_di_riferimento is None:
+            return Piatto.TIPO_CARTA
+        collegamento = PiattoMenu.objects.filter(piatto=piatto, menu=menu_di_riferimento).first()
+        return collegamento.tipo_menu if collegamento else Piatto.TIPO_CARTA
 
     def save(self, *args, **kwargs):
         if not self.prezzo_unitario:
