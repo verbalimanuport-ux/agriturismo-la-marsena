@@ -117,6 +117,9 @@ class Ordine(models.Model):
         self.stato = self.STATO_CHIUSO
         self.chiuso_il = timezone.now()
         self.save()
+        if self.prenotazione_id and self.prenotazione.stato == Prenotazione.STATO_ARRIVATA:
+            self.prenotazione.stato = Prenotazione.STATO_COMPLETATA
+            self.prenotazione.save()
 
     def riapri(self):
         """Rimette il conto in stato aperto — serve quando un tavolo viene
@@ -126,6 +129,9 @@ class Ordine(models.Model):
         self.chiuso_il = None
         self.volte_riaperto = (self.volte_riaperto or 0) + 1
         self.save()
+        if self.prenotazione_id and self.prenotazione.stato == Prenotazione.STATO_COMPLETATA:
+            self.prenotazione.stato = Prenotazione.STATO_ARRIVATA
+            self.prenotazione.save()
 
     @property
     def stato_servizio(self):
@@ -140,6 +146,43 @@ class Ordine(models.Model):
             return "aperto"
         return "completo"
 
+    @property
+    def stato_sala(self):
+        """Stato sintetico a 4 valori per colorare il tavolo in Sala/Cucina/
+        Mappa (il quinto colore, 'libero', si applica quando non c'è nessun
+        ordine aperto — non serve calcolarlo qui, lo decide chi chiama)."""
+        righe = list(self.righe.all())
+        if not righe:
+            return "in_attesa_ordini"
+        if any(r.stato == RigaOrdine.STATO_PRONTO for r in righe):
+            return "pronto"
+        if all(r.stato == RigaOrdine.STATO_SERVITO for r in righe):
+            return "completo"
+        if any(r.stato in (RigaOrdine.STATO_PREVISTO, RigaOrdine.STATO_IN_ATTESA) for r in righe):
+            return "in_cucina"
+        return "in_attesa_ordini"  # tutto ancora in bozza, non ancora inviato
+
+    @property
+    def giro_in_evidenza(self):
+        """Il giro (tra quelli di cucina) più urgente da mostrare accanto al
+        colore del tavolo: il numero più basso non ancora completamente
+        servito. None se non c'è nulla in sospeso lato cucina."""
+        righe_cucina = [r for r in self.righe.all() if r.piatto.categoria.richiede_cucina]
+        non_serviti = [r for r in righe_cucina if r.stato != RigaOrdine.STATO_SERVITO]
+        if not non_serviti:
+            return None
+        numero = min(r.portata for r in non_serviti)
+        stati_giro = {r.stato for r in non_serviti if r.portata == numero}
+        if RigaOrdine.STATO_BOZZA in stati_giro:
+            stato = "bozza"
+        elif RigaOrdine.STATO_PREVISTO in stati_giro:
+            stato = "previsto"
+        elif RigaOrdine.STATO_IN_ATTESA in stati_giro:
+            stato = "in_cucina"
+        else:
+            stato = "pronto"
+        return {"numero": numero, "stato": stato}
+
 
 class RigaOrdine(models.Model):
     ORIGINE_CLIENTE = "cliente"
@@ -150,11 +193,13 @@ class RigaOrdine(models.Model):
     ]
 
     STATO_BOZZA = "bozza"
+    STATO_PREVISTO = "previsto"
     STATO_IN_ATTESA = "in_attesa"
     STATO_PRONTO = "pronto"
     STATO_SERVITO = "servito"
     STATO_CHOICES = [
         (STATO_BOZZA, "Da inviare"),
+        (STATO_PREVISTO, "Previsto (in attesa del via libera)"),
         (STATO_IN_ATTESA, "In cucina"),
         (STATO_PRONTO, "Pronto"),
         (STATO_SERVITO, "Servito"),

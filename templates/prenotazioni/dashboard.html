@@ -44,7 +44,9 @@
         {% endif %}
       </td>
       <td class="py-3 text-center">
-        {% if p.stato == "arrivata" %}
+        {% if p.stato == "completata" %}
+          <span class="badge" style="background-color: var(--color-muted);">✓ Completata</span>
+        {% elif p.stato == "arrivata" %}
           <span class="badge" style="background-color: var(--color-charcoal);">Arrivata</span>
         {% elif p.stato == "confermata" %}
           <span class="badge" style="background-color: var(--color-primary);">Confermata</span>
@@ -54,7 +56,11 @@
       </td>
       <td class="py-3 pe-4">
         <div class="d-flex gap-2 justify-content-end align-items-center flex-wrap">
-        {% if p.stato != "arrivata" %}
+        {% if p.stato == "completata" %}
+          <span class="small" style="color: var(--color-muted);">Servizio concluso</span>
+        {% elif p.stato == "arrivata" %}
+          <a href="{% url 'ordini:gestisci_tavolo' p.tavolo.id %}" class="btn btn-sm" style="background-color: var(--color-primary); color:#fff;">Vai al tavolo →</a>
+        {% else %}
           {% if p.stato != "confermata" %}
           <form method="post" class="d-inline">
             {% csrf_token %}
@@ -81,8 +87,6 @@
             <input type="hidden" name="azione" value="annulla">
             <button type="submit" class="btn btn-sm btn-outline-danger">Annulla</button>
           </form>
-        {% else %}
-          <a href="{% url 'ordini:gestisci_tavolo' p.tavolo.id %}" class="btn btn-sm" style="background-color: var(--color-primary); color:#fff;">Vai al tavolo →</a>
         {% endif %}
         </div>
       </td>

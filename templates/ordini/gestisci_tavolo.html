@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Tavolo {{ tavolo.numero }} - Ordine{% endblock %}
 {% block content %}
-<h1 class="mb-1">Tavolo {{ tavolo.numero }}</h1>
+<div class="d-flex justify-content-between align-items-start mb-1 flex-wrap gap-2">
+  <h1 class="mb-1">Tavolo {{ tavolo.numero }}</h1>
+  <a href="{% url 'ordini:sala' %}" class="btn btn-outline-secondary">🏠 Torna alla Sala</a>
+</div>
 <p class="text-muted mb-4">Zona: {{ tavolo.zona|default:"—" }} · Capienza: {{ tavolo.capienza }}</p>
 
 {% if ordine.prenotazione %}
@@ -108,7 +111,8 @@
 
   <p class="text-muted small mb-4">
     ✅ Le modifiche (quantità, giro, note) si salvano da sole appena esci dal campo —
-    non serve premere nulla. Quando hai finito, premi "Invia in cucina".
+    non serve premere nulla. Quando hai finito, premi "Invia in cucina" — il giro comparirà
+    al cuoco, ma partirà davvero solo quando premi "Via libera cucina" più sotto.
   </p>
 {% endif %}
 
@@ -145,8 +149,17 @@
 {% for giro in giri %}
   <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
     <span class="badge" style="background-color: var(--color-accent);">Giro {{ giro.numero }}</span>
-    {% if giro.stato_giro == "in_cucina" %}
-      <span class="badge bg-secondary">In cucina</span>
+    {% if giro.stato_giro == "previsto" %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="azione" value="via_libera_giro">
+        <input type="hidden" name="portata" value="{{ giro.numero }}">
+        <button type="submit" class="btn btn-lg" style="background-color: var(--color-in-cucina); color:#fff; font-weight:600;">
+          🟢 Via libera cucina
+        </button>
+      </form>
+    {% elif giro.stato_giro == "in_cucina" %}
+      <span class="badge" style="background-color: var(--color-in-cucina);">👨‍🍳 In cucina</span>
     {% elif giro.stato_giro == "pronto" %}
       <form method="post">
         {% csrf_token %}
@@ -160,6 +173,9 @@
       <span class="badge" style="background-color: var(--color-primary);">Servito</span>
     {% endif %}
   </div>
+  {% if giro.stato_giro == "previsto" %}
+    <p class="text-muted small mb-2">La cucina vede già questo giro per organizzarsi, ma parte solo quando dai il via libera.</p>
+  {% endif %}
 
   <div class="table-responsive mb-2">
   <table class="table align-middle">

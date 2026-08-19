@@ -1,7 +1,30 @@
 {% extends "base.html" %}
 {% block title %}Cucina{% endblock %}
 {% block content %}
-<h1 class="mb-4">Cucina — da preparare</h1>
+<h1 class="mb-3">Cucina — da preparare</h1>
+
+<div class="mb-4 p-3" style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
+  <p class="small fw-semibold mb-2" style="color: var(--color-muted); text-transform:uppercase; letter-spacing:0.05em;">Stato sala</p>
+  <div class="d-flex flex-wrap gap-2">
+    {% for dato in riepilogo_sala %}
+      <div class="px-3 py-2 text-center" style="min-width:70px; border-radius:8px; color:#fff; font-weight:700; background-color:
+        {% if dato.pronti %}var(--color-accent){% elif dato.stato_sala == 'completo' %}var(--color-charcoal)
+        {% elif dato.stato_sala == 'in_cucina' %}var(--color-in-cucina){% elif dato.stato_sala == 'in_attesa_ordini' %}var(--color-in-attesa-ordini)
+        {% else %}var(--color-libero){% endif %};">
+        {{ dato.tavolo.numero }}
+        {% if dato.giro %}<div class="small fw-normal">G{{ dato.giro.numero }}</div>{% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  <p class="small mt-2 mb-0" style="color: var(--color-muted);">
+    <span style="color: var(--color-libero);">●</span> Libero &nbsp;
+    <span style="color: var(--color-in-attesa-ordini);">●</span> Senza ordini &nbsp;
+    <span style="color: var(--color-in-cucina);">●</span> In cucina &nbsp;
+    <span style="color: var(--color-accent);">●</span> Pronto &nbsp;
+    <span style="color: var(--color-charcoal);">●</span> Completo
+  </p>
+</div>
+
 <p class="text-muted mb-4">Un solo pulsante per l'intero giro: appena è tutto pronto, segnalo e sparisce da qui — ci pensa il cameriere da lì in poi.</p>
 
 {% for tavolo, righe in tavoli_raggruppati %}
@@ -12,25 +35,32 @@
     <div class="card-body">
       {% regroup righe by portata as giri %}
       {% for giro in giri %}
+        {% with primo_stato=giro.list.0.stato %}
         <div class="d-flex justify-content-between align-items-center mb-2">
           <span class="badge" style="background-color: var(--color-accent);">Giro {{ giro.grouper }}</span>
-          <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="ordine_id" value="{{ giro.list.0.ordine_id }}">
-            <input type="hidden" name="portata" value="{{ giro.grouper }}">
-            <button type="submit" class="btn btn-success">Pronto — tutto il giro</button>
-          </form>
+          {% if primo_stato == "in_attesa" %}
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="ordine_id" value="{{ giro.list.0.ordine_id }}">
+              <input type="hidden" name="portata" value="{{ giro.grouper }}">
+              <button type="submit" class="btn btn-success">Pronto — tutto il giro</button>
+            </form>
+          {% else %}
+            <span class="badge" style="background-color: var(--color-muted);">⏳ In attesa del via libera dal cameriere</span>
+          {% endif %}
         </div>
         <div class="row mb-3">
           {% for riga in giro.list %}
           <div class="col-md-4 mb-3">
-            <div class="card h-100 {% if riga.in_ritardo %}border-danger border-2{% endif %}">
+            <div class="card h-100 {% if riga.in_ritardo %}border-danger border-2{% endif %} {% if primo_stato == 'previsto' %}opacity-75{% endif %}" style="{% if primo_stato == 'previsto' %}background-color: var(--color-bg);{% endif %}">
               <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                   <h5 class="card-title mb-1">{{ riga.quantita }}x {{ riga.piatto.nome }}</h5>
-                  <span class="badge {% if riga.in_ritardo %}bg-danger{% else %}bg-secondary{% endif %} flex-shrink-0">
-                    {{ riga.minuti_attesa }} min
-                  </span>
+                  {% if riga.minuti_attesa is not None %}
+                    <span class="badge {% if riga.in_ritardo %}bg-danger{% else %}bg-secondary{% endif %} flex-shrink-0">
+                      {{ riga.minuti_attesa }} min
+                    </span>
+                  {% endif %}
                 </div>
                 <p class="mb-1 text-muted small">{{ riga.piatto.categoria.nome }}</p>
                 <p class="mb-1 text-muted small">
@@ -47,6 +77,7 @@
           </div>
           {% endfor %}
         </div>
+        {% endwith %}
       {% endfor %}
     </div>
   </div>

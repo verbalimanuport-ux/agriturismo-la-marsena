@@ -7,10 +7,12 @@
 </div>
 <p class="text-muted mb-3">
   Clicca su un tavolo per aprirne la gestione (i tavoli grandi hanno un riquadro più grande,
-  in base ai posti). Colori: <span style="color:#9c9c94;">■</span> libero,
-  <span style="color: var(--color-primary);">■</span> aperto,
-  <span style="color: var(--color-charcoal);">■</span> servizio completo,
-  <span style="color: var(--color-accent);">■</span> ha piatti pronti da ritirare (il numero sul badge).
+  in base ai posti; il numero "G" indica il giro in corso). Colori:
+  <span style="color: var(--color-libero);">■</span> libero,
+  <span style="color: var(--color-in-attesa-ordini);">■</span> aperto senza ordini,
+  <span style="color: var(--color-in-cucina);">■</span> in cucina,
+  <span style="color: var(--color-accent);">■</span> pronto da ritirare,
+  <span style="color: var(--color-charcoal);">■</span> servizio completo.
 </p>
 
 <div id="pannelloModifica" class="alert alert-info" style="display:none;">
@@ -131,16 +133,27 @@
   function renderTavoli() {
     var vecchi = container.querySelectorAll('.marker-tavolo');
     for (var i = 0; i < vecchi.length; i++) { vecchi[i].remove(); }
+    var coloriStato = {
+      libero: '#9C9C94',
+      in_attesa_ordini: '#5B7C99',
+      in_cucina: '#D98B3F',
+      pronto: '#A3452C',
+      completo: '#26282D'
+    };
     tavoli.forEach(function (t) {
       var el = document.createElement('div');
       el.className = 'marker-tavolo';
-      var colore = '#9c9c94';
-      if (t.aperto) colore = '#46592F';
-      if (t.completo) colore = '#26282D';
-      if (t.pronti > 0) colore = '#A3452C';
+      var stato = t.pronti > 0 ? 'pronto' : t.stato_sala;
+      var colore = coloriStato[stato] || coloriStato.libero;
       var dim = dimensioneTavolo(t.capienza);
-      el.style.cssText = 'position:absolute; left:' + t.x + '%; top:' + t.y + '%; width:' + dim.larghezza + 'px; height:' + dim.altezza + 'px; margin-left:-' + (dim.larghezza / 2) + 'px; margin-top:-' + (dim.altezza / 2) + 'px; border-radius:10px; background:' + colore + '; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.25); z-index:10; font-family:Fraunces,serif; font-size:1.05rem;';
+      el.style.cssText = 'position:absolute; left:' + t.x + '%; top:' + t.y + '%; width:' + dim.larghezza + 'px; height:' + dim.altezza + 'px; margin-left:-' + (dim.larghezza / 2) + 'px; margin-top:-' + (dim.altezza / 2) + 'px; border-radius:10px; background:' + colore + '; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.25); z-index:10; font-family:Fraunces,serif; font-size:1.05rem; line-height:1.1;';
       el.textContent = t.numero;
+      if (t.giro) {
+        var etichettaGiro = document.createElement('div');
+        etichettaGiro.textContent = 'G' + t.giro.numero;
+        etichettaGiro.style.cssText = 'font-size:0.65rem; font-weight:500; opacity:0.9;';
+        el.appendChild(etichettaGiro);
+      }
       if (t.pronti > 0) {
         var badge = document.createElement('span');
         badge.textContent = t.pronti;

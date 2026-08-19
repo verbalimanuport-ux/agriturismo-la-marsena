@@ -65,11 +65,13 @@ class Prenotazione(models.Model):
     STATO_IN_ATTESA = "in_attesa"
     STATO_CONFERMATA = "confermata"
     STATO_ARRIVATA = "arrivata"
+    STATO_COMPLETATA = "completata"
     STATO_ANNULLATA = "annullata"
     STATO_CHOICES = [
         (STATO_IN_ATTESA, "In attesa di conferma"),
         (STATO_CONFERMATA, "Confermata"),
         (STATO_ARRIVATA, "Arrivata"),
+        (STATO_COMPLETATA, "Completata"),
         (STATO_ANNULLATA, "Annullata"),
     ]
 

@@ -641,7 +641,43 @@ Da **Menù → Impostazioni**: quanti minuti prima che un piatto venga evidenzia
 in Cucina (prima era fisso a 15). Alzatelo se durante il servizio l'allarme scatta troppo
 spesso — un allarme che suona sempre viene ignorato.
 
-## 46. Prossimo passo
+## 47. Via libera cucina, colori sala, prenotazioni completate
+
+Due nuove migrazioni:
+
+```
+python manage.py migrate
+```
+
+### 🟢 Via libera manuale per ogni giro (anche il primo)
+"Invia in cucina" non fa più partire nulla da solo: ogni giro, **compreso il primo**,
+resta nello stato **"Previsto"** finché il cameriere non preme il pulsante dedicato
+**"🟢 Via libera cucina"** sulla pagina del tavolo. La cucina vede comunque tutto
+l'ordine fin da subito (per organizzarsi), ma i giri "Previsti" sono mostrati attenuati,
+senza cronometro e senza pulsante — il cuoco sa a colpo d'occhio cosa può già iniziare e
+cosa no.
+
+### 🏠 Pulsante "Torna alla Sala"
+Ben visibile in cima alla pagina del tavolo, accanto al numero — non serve più scorrere
+fino in fondo.
+
+### 🎨 Sala e Mappa: 5 colori invece di 3
+Nuovi stati distinti: **libero** (grigio), **aperto senza ordini** (blu), **in cucina**
+(ambra), **pronto da ritirare** (rosso, invariato), **servizio completo** (antracite,
+invariato). Sala e Mappa mostrano anche il **numero del giro** in corso accanto al colore.
+
+### 👨‍🍳 Riepilogo sala nella schermata Cucina
+In cima alla pagina Cucina, una striscia compatta con lo stato colorato di tutti i
+tavoli (stessa legenda di Sala/Mappa) — il cuoco vede il colpo d'occhio della sala senza
+cambiare pagina.
+
+### 📋 Prenotazioni: nuovo stato "Completata"
+Quando il conto collegato a una prenotazione viene chiuso, la prenotazione passa da sola
+a **"Completata"** — resta visibile nell'elenco di oggi (utile per il riepilogo di fine
+serata) ma chiaramente distinta, senza più pulsanti d'azione. Se il conto viene riaperto
+per errore, torna "Arrivata" in automatico.
+
+## 48. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.

@@ -1,30 +1,48 @@
 {% extends "base.html" %}
 {% block title %}Sala{% endblock %}
 {% block content %}
-<h1 class="mb-4">Sala — stato tavoli</h1>
+<h1 class="mb-2">Sala — stato tavoli</h1>
+<p class="text-muted small mb-4">
+  <span style="color: var(--color-libero);">●</span> Libero &nbsp;
+  <span style="color: var(--color-in-attesa-ordini);">●</span> Aperto, non ha ancora ordinato &nbsp;
+  <span style="color: var(--color-in-cucina);">●</span> In cucina &nbsp;
+  <span style="color: var(--color-accent);">●</span> Pronto da ritirare &nbsp;
+  <span style="color: var(--color-charcoal);">●</span> Servizio completo
+</p>
 <div class="row">
-  {% for tavolo, ordine, pronti, stato_servizio in tavoli_con_ordine %}
+  {% for dato in dati_tavoli %}
+  {% with tavolo=dato.tavolo stato=dato.stato_sala pronti=dato.pronti giro=dato.giro %}
   <div class="col-6 col-md-3 mb-3">
     <a href="{% url 'ordini:gestisci_tavolo' tavolo.id %}" class="text-decoration-none">
-      <div class="card {% if ordine %}border-success{% endif %} {% if pronti %}border-warning border-2{% endif %}">
+      <div class="card" style="border-color:
+        {% if pronti %}var(--color-accent){% elif stato == 'completo' %}var(--color-charcoal)
+        {% elif stato == 'in_cucina' %}var(--color-in-cucina){% elif stato == 'in_attesa_ordini' %}var(--color-in-attesa-ordini)
+        {% else %}var(--color-libero){% endif %}; border-width: 2px;">
         <div class="card-body text-center">
           <h5>Tavolo {{ tavolo.numero }}</h5>
-          {% if stato_servizio == "completo" %}
-            <span class="badge d-block mb-1" style="background-color: var(--color-charcoal);">✅ Servizio completo</span>
-          {% elif ordine %}
-            <span class="badge bg-success d-block mb-1">Aperto — &euro;{{ ordine.totale }}</span>
-          {% else %}
-            <span class="badge bg-secondary">Libero</span>
-          {% endif %}
           {% if pronti %}
-            <span class="badge" style="background-color: var(--color-accent);">
-              🔔 {{ pronti }} pront{{ pronti|pluralize:"o,i" }} da ritirare
+            <span class="badge d-block mb-1" style="background-color: var(--color-accent);">
+              🔔 {{ pronti }} pront{{ pronti|pluralize:"o,i" }}{% if giro %} · Giro {{ giro.numero }}{% endif %}
             </span>
+          {% elif stato == "completo" %}
+            <span class="badge d-block mb-1" style="background-color: var(--color-charcoal);">✅ Servizio completo</span>
+          {% elif stato == "in_cucina" %}
+            <span class="badge d-block mb-1" style="background-color: var(--color-in-cucina);">
+              👨‍🍳 In cucina{% if giro %} · Giro {{ giro.numero }}{% endif %}
+            </span>
+            {% if giro.stato == "previsto" %}
+              <span class="small d-block" style="color: var(--color-muted);">in attesa del via libera</span>
+            {% endif %}
+          {% elif stato == "in_attesa_ordini" and dato.ordine %}
+            <span class="badge d-block mb-1" style="background-color: var(--color-in-attesa-ordini);">Aperto — &euro;{{ dato.ordine.totale }}</span>
+          {% else %}
+            <span class="badge" style="background-color: var(--color-libero);">Libero</span>
           {% endif %}
         </div>
       </div>
     </a>
   </div>
+  {% endwith %}
   {% empty %}
     <p>Nessun tavolo attivo configurato. Aggiungili da <a href="/admin/prenotazioni/tavolo/">/admin/</a>.</p>
   {% endfor %}

@@ -17,6 +17,39 @@ from .models import Ordine, RigaOrdine
 SOGLIA_ATTESA_MINUTI = 15
 
 
+def _riepilogo_tavoli():
+    """Stato sintetico di tutti i tavoli attivi, usato da Sala, Mappa e dalla
+    striscia di riepilogo nella schermata Cucina — un solo posto dove
+    calcolarlo, per non ripetere la stessa logica in tre punti diversi."""
+    tavoli = Tavolo.objects.filter(attivo=True).order_by("numero")
+    ordini_aperti = {
+        o.tavolo_id: o
+        for o in Ordine.objects.filter(stato=Ordine.STATO_APERTO).prefetch_related(
+            "righe__piatto__categoria"
+        )
+    }
+    risultato = []
+    for t in tavoli:
+        ordine = ordini_aperti.get(t.id)
+        if ordine is None:
+            risultato.append(
+                {"tavolo": t, "ordine": None, "pronti": 0, "stato_sala": "libero", "giro": None}
+            )
+            continue
+        righe = list(ordine.righe.all())
+        pronti = sum(1 for r in righe if r.stato == RigaOrdine.STATO_PRONTO)
+        risultato.append(
+            {
+                "tavolo": t,
+                "ordine": ordine,
+                "pronti": pronti,
+                "stato_sala": ordine.stato_sala,
+                "giro": ordine.giro_in_evidenza,
+            }
+        )
+    return risultato
+
+
 def _genera_portate_standard_se_fisso(ordine, utente):
     """Se è attivo il menù fisso, crea automaticamente una riga per OGNI
     piatto fisso disponibile, con quantità pari ai coperti del tavolo — nel
@@ -112,39 +145,14 @@ def ordina_tavolo(request, numero_tavolo):
 
 @login_required
 def sala(request):
-    """Vista d'insieme per lo staff: quali tavoli hanno un conto aperto,
-    quali hanno piatti pronti da ritirare, e quali hanno finito il servizio
-    (tutto servito, in attesa solo del conto)."""
-    tavoli = Tavolo.objects.filter(attivo=True)
-    ordini_aperti = {
-        o.tavolo_id: o
-        for o in Ordine.objects.filter(stato=Ordine.STATO_APERTO).prefetch_related(
-            "righe__piatto__categoria"
-        )
-    }
-
-    pronti_per_ordine = {
-        r["ordine_id"]: r["totale"]
-        for r in RigaOrdine.objects.filter(
-            ordine__stato=Ordine.STATO_APERTO, stato=RigaOrdine.STATO_PRONTO
-        )
-        .values("ordine_id")
-        .annotate(totale=Count("id"))
-    }
-
-    tavoli_con_ordine = []
-    totale_pronti = 0
-    for t in tavoli:
-        ordine = ordini_aperti.get(t.id)
-        pronti = pronti_per_ordine.get(ordine.id, 0) if ordine else 0
-        totale_pronti += pronti
-        stato_servizio = ordine.stato_servizio if ordine else None
-        tavoli_con_ordine.append((t, ordine, pronti, stato_servizio))
-
+    """Vista d'insieme per lo staff: colore e stato di ogni tavolo, quanti
+    piatti sono pronti da ritirare."""
+    dati = _riepilogo_tavoli()
+    totale_pronti = sum(d["pronti"] for d in dati)
     return render(
         request,
         "ordini/sala.html",
-        {"tavoli_con_ordine": tavoli_con_ordine, "totale_pronti": totale_pronti},
+        {"dati_tavoli": dati, "totale_pronti": totale_pronti},
     )
 
 
@@ -268,15 +276,31 @@ def gestisci_tavolo(request, tavolo_id):
             adesso_invio = timezone.now()
             for riga in righe_da_inviare:
                 if riga.piatto.categoria.richiede_cucina:
-                    riga.stato = RigaOrdine.STATO_IN_ATTESA
+                    # Anche il primo giro resta "Previsto": parte davvero solo
+                    # quando il cameriere dà il via libera dalla pagina del
+                    # tavolo. La cucina lo vede comunque subito, per potersi
+                    # organizzare in anticipo.
+                    riga.stato = RigaOrdine.STATO_PREVISTO
                 else:
                     riga.stato = RigaOrdine.STATO_PRONTO
-                riga.inviata_il = adesso_invio
+                    riga.inviata_il = adesso_invio
                 riga.save()
             if righe_da_inviare:
-                messages.success(request, f"Ordine inviato! ({len(righe_da_inviare)} voci)")
+                messages.success(
+                    request,
+                    f"Ordine inviato! ({len(righe_da_inviare)} voci) — dai il via libera "
+                    "alla cucina quando siete pronti a far partire ogni giro.",
+                )
             else:
                 messages.info(request, "Non c'era nulla da inviare.")
+        elif azione == "via_libera_giro":
+            portata = request.POST.get("portata")
+            adesso = timezone.now()
+            aggiornate = RigaOrdine.objects.filter(
+                ordine=ordine, portata=portata, stato=RigaOrdine.STATO_PREVISTO
+            ).update(stato=RigaOrdine.STATO_IN_ATTESA, inviata_il=adesso)
+            if aggiornate:
+                messages.success(request, f"Via libera dato al giro {portata}: ora è in cucina.")
         elif azione == "giro_servito":
             portata = request.POST.get("portata")
             RigaOrdine.objects.filter(
@@ -354,7 +378,9 @@ def gestisci_tavolo(request, tavolo_id):
     for numero in sorted(giri_map.keys()):
         righe_giro = giri_map[numero]
         stati = {r.stato for r in righe_giro}
-        if RigaOrdine.STATO_IN_ATTESA in stati:
+        if RigaOrdine.STATO_PREVISTO in stati:
+            stato_giro = "previsto"
+        elif RigaOrdine.STATO_IN_ATTESA in stati:
             stato_giro = "in_cucina"
         elif RigaOrdine.STATO_PRONTO in stati:
             stato_giro = "pronto"
@@ -394,10 +420,13 @@ def gestisci_tavolo(request, tavolo_id):
 def cucina(request):
     """Vista per la cucina: cosa preparare, raggruppato per tavolo e per giro
     (solo per le categorie che richiedono cucina: vini/bibite/caffè non
-    compaiono mai qui). Un solo pulsante 'Pronto' per l'intero giro (non per
-    singolo piatto): una volta segnato, il giro sparisce dalla vista cucina —
-    da lì in poi tocca al cameriere, che lo vede pronto sulla pagina del
-    tavolo e lo consegna."""
+    compaiono mai qui). Include anche i giri "Previsti" — inviati dal
+    cameriere ma non ancora avviati col via libera — per permettere di
+    organizzarsi in anticipo, mostrati però senza cronometro e senza pulsante,
+    dato che non si può ancora agire su di loro. Un solo pulsante 'Pronto' per
+    l'intero giro attivo (non per singolo piatto): una volta segnato, il giro
+    sparisce da qui — da lì in poi tocca al cameriere, che lo vede pronto
+    sulla pagina del tavolo e lo consegna."""
     if request.method == "POST":
         ordine_id = request.POST.get("ordine_id")
         portata = request.POST.get("portata")
@@ -409,7 +438,7 @@ def cucina(request):
     righe = (
         RigaOrdine.objects.filter(
             ordine__stato=Ordine.STATO_APERTO,
-            stato=RigaOrdine.STATO_IN_ATTESA,
+            stato__in=[RigaOrdine.STATO_PREVISTO, RigaOrdine.STATO_IN_ATTESA],
             piatto__categoria__richiede_cucina=True,
         )
         .select_related("ordine__tavolo", "piatto__categoria", "inviato_da")
@@ -420,18 +449,26 @@ def cucina(request):
     soglia = ImpostazioniMenu.ottieni().soglia_ritardo_cucina_minuti or SOGLIA_ATTESA_MINUTI
     tavoli_raggruppati = {}
     for riga in righe:
-        # Il tempo di attesa parte da quando la comanda è stata INVIATA, non da
-        # quando il cameriere l'ha composta (poteva restare in bozza a lungo).
-        riferimento = riga.inviata_il or riga.creata_il
-        riga.minuti_attesa = int((adesso - riferimento).total_seconds() // 60)
-        riga.in_ritardo = riga.minuti_attesa >= soglia
+        if riga.stato == RigaOrdine.STATO_IN_ATTESA:
+            # Il tempo di attesa parte da quando è arrivato il via libera, non
+            # da quando il cameriere ha composto la comanda.
+            riferimento = riga.inviata_il or riga.creata_il
+            riga.minuti_attesa = int((adesso - riferimento).total_seconds() // 60)
+            riga.in_ritardo = riga.minuti_attesa >= soglia
+        else:
+            riga.minuti_attesa = None
+            riga.in_ritardo = False
         tavolo = riga.ordine.tavolo
         tavoli_raggruppati.setdefault(tavolo, []).append(riga)
 
     return render(
         request,
         "ordini/cucina.html",
-        {"tavoli_raggruppati": tavoli_raggruppati.items(), "totale_in_attesa": len(righe)},
+        {
+            "tavoli_raggruppati": tavoli_raggruppati.items(),
+            "totale_in_attesa": len(righe),
+            "riepilogo_sala": _riepilogo_tavoli(),
+        },
     )
 
 
@@ -499,33 +536,16 @@ def mappa_tavoli(request):
         layout.save()
         return JsonResponse({"ok": True})
 
-    tavoli_qs = Tavolo.objects.filter(attivo=True).order_by("numero")
-    ordini_aperti = {
-        o.tavolo_id: o
-        for o in Ordine.objects.filter(stato=Ordine.STATO_APERTO).prefetch_related(
-            "righe__piatto__categoria"
-        )
-    }
-    pronti_per_ordine = {
-        r["ordine_id"]: r["totale"]
-        for r in RigaOrdine.objects.filter(
-            ordine__stato=Ordine.STATO_APERTO, stato=RigaOrdine.STATO_PRONTO
-        )
-        .values("ordine_id")
-        .annotate(totale=Count("id"))
-    }
-
+    dati = _riepilogo_tavoli()
     tavoli_dati = []
-    for i, t in enumerate(tavoli_qs):
+    for i, d in enumerate(dati):
+        t = d["tavolo"]
         x, y = t.pos_x, t.pos_y
         if x is None or y is None:
             # posizione di partenza a griglia, finché lo staff non li trascina
             colonne = 4
             x = 15 + (i % colonne) * 25
             y = 20 + (i // colonne) * 25
-        ordine = ordini_aperti.get(t.id)
-        pronti = pronti_per_ordine.get(ordine.id, 0) if ordine else 0
-        stato_servizio = ordine.stato_servizio if ordine else None
         tavoli_dati.append(
             {
                 "id": t.id,
@@ -533,10 +553,10 @@ def mappa_tavoli(request):
                 "capienza": t.capienza,
                 "x": x,
                 "y": y,
-                "aperto": bool(ordine),
-                "completo": stato_servizio == "completo",
-                "totale": float(ordine.totale) if ordine else 0,
-                "pronti": pronti,
+                "stato_sala": d["stato_sala"],
+                "pronti": d["pronti"],
+                "giro": d["giro"],
+                "totale": float(d["ordine"].totale) if d["ordine"] else 0,
             }
         )
 
