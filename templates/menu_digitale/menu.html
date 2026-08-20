@@ -44,6 +44,18 @@
       </div>
     {% endif %}
 
+    {% if piatti_bambini %}
+      <div class="mb-5 p-3" style="background-color: var(--color-bg); border-radius: var(--radius-md); border: 1px dashed var(--color-border);">
+        <h2 class="h5 mb-1" style="color: var(--color-primary); font-family:'Fraunces',serif;">👶 Menù Bambini</h2>
+        {% if menu_attivo.prezzo_menu_bambini_a_persona > 0 %}
+          <p class="small fw-semibold mb-2" style="color: var(--color-muted);">&euro;{{ menu_attivo.prezzo_menu_bambini_a_persona }} a persona</p>
+        {% endif %}
+        <p class="mb-0 small" style="color: var(--color-muted);">
+          {% for piatto in piatti_bambini %}{{ piatto.nome }}{% if not forloop.last %} · {% endif %}{% endfor %}
+        </p>
+      </div>
+    {% endif %}
+
     {% for categoria in categorie %}
       <div class="mb-4 {% if not forloop.first %}mt-5{% endif %}">
         <h2 class="h4 text-uppercase mb-0" style="color: var(--color-primary); letter-spacing: 0.12em; font-size: 1.05rem;">{{ categoria.nome }}</h2>
@@ -62,7 +74,7 @@
           {% endif %}
           <div class="fw-semibold" style="font-family:'Fraunces',serif; font-size:1.12rem;">{{ piatto.nome }}</div>
           {% if menu_attivo.modalita_attiva != "fisso" or piatto.categoria.sempre_a_parte %}
-            <span class="d-inline-block mt-1 fw-semibold" style="color: var(--color-accent); background-color: var(--color-accent-soft); padding: 0.15rem 0.65rem; border-radius: 999px; font-size: 0.88rem;">&euro;{{ piatto.prezzo }}</span>
+            <div class="mt-1" style="color: var(--color-muted); font-size: 0.95rem; letter-spacing: 0.03em;">&euro;{{ piatto.prezzo }}</div>
           {% endif %}
           {% if piatto.descrizione %}
             <p class="mb-0 mt-1 fst-italic small" style="color: var(--color-muted);">{{ piatto.descrizione }}</p>
