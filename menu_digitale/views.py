@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .models import Categoria, ImpostazioniMenu, Menu, categorie_con_piatti_per_menu, categorie_per_ruolo
+from .models import Categoria, ImpostazioniMenu, Menu, categorie_con_piatti_per_menu, categorie_per_ruolo, piatti_bambini_per_menu
 
 TITOLI_RUOLO = {
     Categoria.RUOLO_VINI: "Carta dei Vini",
@@ -19,10 +19,16 @@ def menu_pubblico(request):
     menu_attivo = Menu.ottieni_attivo()
     impostazioni = ImpostazioniMenu.ottieni()
     categorie = categorie_con_piatti_per_menu(menu_attivo)
+    piatti_bambini = piatti_bambini_per_menu(menu_attivo)
     return render(
         request,
         "menu_digitale/menu.html",
-        {"categorie": categorie, "menu_attivo": menu_attivo, "impostazioni": impostazioni},
+        {
+            "categorie": categorie,
+            "menu_attivo": menu_attivo,
+            "impostazioni": impostazioni,
+            "piatti_bambini": piatti_bambini,
+        },
     )
 
 
@@ -53,6 +59,7 @@ def menu_dettaglio(request, menu_id):
     menu = get_object_or_404(Menu, id=menu_id)
     impostazioni = ImpostazioniMenu.ottieni()
     categorie = categorie_con_piatti_per_menu(menu)
+    piatti_bambini = piatti_bambini_per_menu(menu)
     menu_veramente_attivo = Menu.ottieni_attivo()
     e_anteprima = menu_veramente_attivo is None or menu.id != menu_veramente_attivo.id
     return render(
@@ -63,6 +70,7 @@ def menu_dettaglio(request, menu_id):
             "menu_attivo": menu,
             "impostazioni": impostazioni,
             "e_anteprima": e_anteprima,
+            "piatti_bambini": piatti_bambini,
         },
     )
 

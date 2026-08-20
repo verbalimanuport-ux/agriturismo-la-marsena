@@ -972,7 +972,33 @@ e prezzo proprio.
   per il resto (cambiare il prezzo a metà servizio non altera i conti aperti)
 - **Preconto**: adulti e bambini mostrati come righe separate, ciascuno al proprio prezzo
 
-## 64. Prossimo passo
+## 65. Tre correzioni dopo i test dal vivo
+
+Nessuna nuova migrazione — solo logica e visualizzazione.
+
+### ✓ Casellina "Servito Gx" persistente
+Quando un giro viene consegnato mentre un altro è ancora in cucina, il colore/testo del
+tavolo passava subito al giro attivo, facendo sparire l'informazione "il Giro 1 è stato
+consegnato". Ora una nuova casellina indipendente (sotto il riquadro principale, sia in
+Sala che nella striscia Cucina) mostra **"✓ Servito G1"** — e a differenza del colore
+"Appena servito" delle bevande, **non scade a tempo**: resta finché non viene consegnato
+anche il giro successivo (tra una portata e l'altra può passare più di qualche minuto,
+l'informazione resterebbe comunque vera).
+
+### 👶 Menù bambini finalmente visibile
+Bug corretto: avevamo costruito tutta la parte gestionale ma dimenticato di mostrarlo ai
+clienti. Ora, quando è attivo, compare **direttamente nella pagina principale del menù**
+(non dietro un pulsante come Vini/Dolci/Bevande — è un'informazione che chi prenota o è
+già al tavolo vuole vedere subito): un riquadro dedicato "👶 Menù Bambini" con il prezzo e
+l'elenco dei piatti, sia nel menù pubblico sia in quello mostrato dal QR.
+
+### 🎨 Prezzi senza badge rosso
+I prezzi accanto a ogni piatto (menù portate, Vini, Dolci, Bevande) non hanno più lo
+sfondo colorato acceso — solo testo semplice ed elegante, coerente con lo stile "carta
+scritta a mano" della cornice sottile. Il banner del prezzo del menù fisso in alto resta
+invece con il suo risalto: è un annuncio unico, non un'etichetta ripetuta su ogni riga.
+
+## 66. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.

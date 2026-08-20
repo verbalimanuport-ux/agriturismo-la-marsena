@@ -301,3 +301,17 @@ def categorie_per_ruolo(menu, ruolo):
     """Le categorie di un ruolo specifico (Vini/Dolci/Bevande) per la loro
     pagina pubblica dedicata."""
     return _raggruppa_per_categoria(_piatti_per_menu_e_ruolo(menu, ruolo))
+
+
+def piatti_bambini_per_menu(menu):
+    """I piatti del menù bambini di questa edizione, SOLO se il menù
+    bambini è davvero disponibile ora (acceso E modalità fisso) —
+    altrimenti lista vuota, così il menù pubblico non deve controllare
+    tutte le condizioni ogni volta."""
+    if menu is None or not menu.bambini_disponibile:
+        return []
+    return list(
+        menu.piatti_bambini.filter(disponibile=True)
+        .select_related("categoria")
+        .order_by("categoria__ordine", "ordine", "nome")
+    )

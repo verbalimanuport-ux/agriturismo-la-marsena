@@ -302,6 +302,33 @@ class Ordine(models.Model):
             stato = "bozza"
         return {"numero": numero, "stato": stato}
 
+    @property
+    def ultimo_giro_servito(self):
+        """Il numero del giro più alto che è stato COMPLETAMENTE servito
+        (tutti i suoi piatti di cucina), da mostrare in una casellina a
+        parte finché non viene servito anche il giro successivo — a
+        differenza del colore "appena servito" per le bevande, questo NON
+        scade a tempo: tra una portata e l'altra può passare più di
+        qualche minuto, e l'informazione resterebbe comunque vera. None se
+        non c'è ancora nulla servito, o se è tutto servito (quel caso ha
+        già il suo colore/badge dedicato "Servizio completo")."""
+        righe_cucina = [r for r in self.righe.all() if r.piatto.categoria.richiede_cucina]
+        if not righe_cucina:
+            return None
+        per_giro = {}
+        for r in righe_cucina:
+            per_giro.setdefault(r.portata, []).append(r)
+        giri_serviti = [
+            numero
+            for numero, righe_giro in per_giro.items()
+            if all(r.stato == RigaOrdine.STATO_SERVITO for r in righe_giro)
+        ]
+        if not giri_serviti:
+            return None
+        if all(r.stato == RigaOrdine.STATO_SERVITO for r in righe_cucina):
+            return None
+        return max(giri_serviti)
+
 
 class RigaOrdine(models.Model):
     ORIGINE_CLIENTE = "cliente"

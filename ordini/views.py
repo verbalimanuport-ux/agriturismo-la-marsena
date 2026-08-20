@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from menu_digitale.models import Categoria, ImpostazioniMenu, Menu, Piatto, categorie_con_piatti_per_menu
+from menu_digitale.models import Categoria, ImpostazioniMenu, Menu, Piatto, categorie_con_piatti_per_menu, piatti_bambini_per_menu
 from prenotazioni.models import LayoutSala, Tavolo
 
 from .forms import AggiungiPiattoForm
@@ -43,6 +43,7 @@ def _riepilogo_tavoli():
                     "giro": None,
                     "bevande_da_servire": False,
                     "bevande_servite": False,
+                    "ultimo_giro_servito": None,
                 }
             )
             continue
@@ -77,6 +78,7 @@ def _riepilogo_tavoli():
                 "giro": ordine.giro_in_evidenza,
                 "bevande_da_servire": bevande_da_servire,
                 "bevande_servite": bevande_servite,
+                "ultimo_giro_servito": ordine.ultimo_giro_servito,
             }
         )
     return risultato
@@ -166,10 +168,17 @@ def ordina_tavolo(request, numero_tavolo):
 
     if not impostazioni.ordini_qr_abilitati:
         categorie = categorie_con_piatti_per_menu(menu_attivo)
+        piatti_bambini = piatti_bambini_per_menu(menu_attivo)
         return render(
             request,
             "ordini/solo_menu_tavolo.html",
-            {"tavolo": tavolo, "categorie": categorie, "menu_attivo": menu_attivo, "impostazioni": impostazioni},
+            {
+                "tavolo": tavolo,
+                "categorie": categorie,
+                "menu_attivo": menu_attivo,
+                "impostazioni": impostazioni,
+                "piatti_bambini": piatti_bambini,
+            },
         )
 
     ordine = Ordine.per_tavolo_aperto(tavolo)
