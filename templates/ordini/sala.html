@@ -5,7 +5,8 @@
 <p class="text-muted small mb-4">
   <span style="color: var(--color-libero);">●</span> Libero &nbsp;
   <span style="color: var(--color-in-attesa-ordini);">●</span> Aperto, non ha ancora ordinato &nbsp;
-  <span style="color: var(--color-in-cucina);">●</span> In cucina &nbsp;
+  <span style="color: var(--color-previsto);">●</span> In attesa del via libera &nbsp;
+  <span style="color: var(--color-in-cucina);">●</span> In preparazione &nbsp;
   <span style="color: var(--color-accent);">●</span> Pronto da ritirare &nbsp;
   <span style="color: var(--color-appena-servito);">●</span> Appena servito &nbsp;
   <span style="color: var(--color-charcoal);">●</span> Servizio completo
@@ -17,10 +18,11 @@
     <a href="{% url 'ordini:gestisci_tavolo' tavolo.id %}" class="text-decoration-none">
       <div class="card" style="border-color:
         {% if pronti %}var(--color-accent){% elif stato == 'appena_servito' %}var(--color-appena-servito){% elif stato == 'completo' %}var(--color-charcoal)
-        {% elif stato == 'in_cucina' %}var(--color-in-cucina){% elif stato == 'in_attesa_ordini' %}var(--color-in-attesa-ordini)
+        {% elif stato == 'in_preparazione' %}var(--color-in-cucina){% elif stato == 'previsto' %}var(--color-previsto){% elif stato == 'in_attesa_ordini' %}var(--color-in-attesa-ordini)
         {% else %}var(--color-libero){% endif %}; border-width: 2px;">
         <div class="card-body text-center">
-          <h5>Tavolo {{ tavolo.numero }}</h5>
+          <h5 class="mb-0">Tavolo {{ tavolo.numero }}</h5>
+          <p class="small mb-2" style="color: var(--color-muted);">{{ tavolo.capienza }} post{{ tavolo.capienza|pluralize:"o,i" }}</p>
           {% if pronti %}
             <span class="badge d-block mb-1 badge-info" style="background-color: var(--color-accent);">
               🔔 {{ pronti }} pront{{ pronti|pluralize:"o,i" }}{% if giro %} · Giro {{ giro.numero }}{% endif %}
@@ -29,13 +31,14 @@
             <span class="badge d-block mb-1 badge-info" style="background-color: var(--color-appena-servito);">✓ Appena servito</span>
           {% elif stato == "completo" %}
             <span class="badge d-block mb-1 badge-info" style="background-color: var(--color-charcoal);">✅ Servizio completo</span>
-          {% elif stato == "in_cucina" %}
+          {% elif stato == "in_preparazione" %}
             <span class="badge d-block mb-1 badge-info" style="background-color: var(--color-in-cucina);">
-              👨‍🍳 In cucina{% if giro %} · Giro {{ giro.numero }}{% endif %}
+              👨‍🍳 In preparazione{% if giro %} · Giro {{ giro.numero }}{% endif %}
             </span>
-            {% if giro.stato == "previsto" %}
-              <span class="small d-block" style="color: var(--color-muted);">in attesa del via libera</span>
-            {% endif %}
+          {% elif stato == "previsto" %}
+            <span class="badge d-block mb-1 badge-info" style="background-color: var(--color-previsto); color:#3D3208;">
+              ⏳ In attesa del via libera{% if giro %} · Giro {{ giro.numero }}{% endif %}
+            </span>
           {% elif stato == "in_attesa_ordini" and dato.ordine %}
             <span class="badge d-block mb-1 badge-info" style="background-color: var(--color-in-attesa-ordini);">Aperto — &euro;{{ dato.ordine.totale }}</span>
           {% else %}

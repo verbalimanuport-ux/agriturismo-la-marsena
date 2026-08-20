@@ -8,10 +8,11 @@
   <div class="d-flex flex-wrap gap-2">
     {% for dato in riepilogo_sala %}
       <div class="text-center">
-        <div class="px-3 py-2" style="min-width:70px; border-radius:8px; color:#fff; font-weight:700; background-color:
+        <div class="px-3 py-2" style="min-width:70px; border-radius:8px; font-weight:700; background-color:
           {% if dato.pronti %}var(--color-accent){% elif dato.stato_sala == 'appena_servito' %}var(--color-appena-servito)
-          {% elif dato.stato_sala == 'completo' %}var(--color-charcoal){% elif dato.stato_sala == 'in_cucina' %}var(--color-in-cucina)
-          {% elif dato.stato_sala == 'in_attesa_ordini' %}var(--color-in-attesa-ordini){% else %}var(--color-libero){% endif %};">
+          {% elif dato.stato_sala == 'completo' %}var(--color-charcoal){% elif dato.stato_sala == 'in_preparazione' %}var(--color-in-cucina)
+          {% elif dato.stato_sala == 'previsto' %}var(--color-previsto){% elif dato.stato_sala == 'in_attesa_ordini' %}var(--color-in-attesa-ordini){% else %}var(--color-libero){% endif %};
+          color: {% if dato.stato_sala == 'previsto' and not dato.pronti %}#3D3208{% else %}#fff{% endif %};">
           {{ dato.tavolo.numero }}
           {% if dato.giro %}<div class="small fw-normal">G{{ dato.giro.numero }}</div>{% endif %}
         </div>
@@ -29,7 +30,8 @@
   <p class="small mt-2 mb-0" style="color: var(--color-muted);">
     <span style="color: var(--color-libero);">●</span> Libero &nbsp;
     <span style="color: var(--color-in-attesa-ordini);">●</span> Senza ordini &nbsp;
-    <span style="color: var(--color-in-cucina);">●</span> In cucina &nbsp;
+    <span style="color: var(--color-previsto);">●</span> In attesa del via libera &nbsp;
+    <span style="color: var(--color-in-cucina);">●</span> In preparazione &nbsp;
     <span style="color: var(--color-accent);">●</span> Pronto &nbsp;
     <span style="color: var(--color-appena-servito);">●</span> Appena servito &nbsp;
     <span style="color: var(--color-charcoal);">●</span> Completo

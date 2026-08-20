@@ -25,6 +25,7 @@
     --color-libero: #9C9C94;
     --color-in-attesa-ordini: #5B7C99;
     --color-in-cucina: #D98B3F;
+    --color-previsto: #C9A227;
     --color-verde-acceso: #2FA84F;
     --color-appena-servito: #2E9E8F;
     --radius-lg: 20px;
@@ -232,6 +233,7 @@
             </a>
             <ul class="dropdown-menu dropdown-menu-end">
               <li><a class="dropdown-item" href="{% url 'prenotazioni:dashboard' %}">Area staff</a></li>
+              <li><a class="dropdown-item" href="{% url 'prenotazioni:disponibilita' %}">Posti rimasti</a></li>
               <li><a class="dropdown-item" href="{% url 'ordini:sala' %}">Sala</a></li>
               <li><a class="dropdown-item" href="{% url 'ordini:mappa_tavoli' %}">Mappa tavoli</a></li>
               <li><a class="dropdown-item" href="{% url 'ordini:cucina' %}">Cucina</a></li>
