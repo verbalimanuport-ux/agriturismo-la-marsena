@@ -1,9 +1,11 @@
 import logging
+from datetime import date
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
+from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -142,5 +144,41 @@ def dashboard(request):
             "prossime": prossime,
             "oggi": oggi,
             "tavoli_attivi": tavoli_attivi,
+        },
+    )
+
+
+@login_required
+def disponibilita(request):
+    """Quanti posti restano liberi per una data data — stima semplice:
+    capienza totale dei tavoli attivi meno i coperti già prenotati quel
+    giorno (prenotazioni non annullate). NON tiene conto degli orari: se in
+    futuro si facessero più turni sullo stesso tavolo nella stessa sera,
+    questa stima sottovaluterebbe la disponibilità vera — per un servizio a
+    turno unico va bene così."""
+    data_raw = request.GET.get("data", "")
+    try:
+        data_scelta = date.fromisoformat(data_raw) if data_raw else timezone.localdate()
+    except ValueError:
+        data_scelta = timezone.localdate()
+
+    posti_totali = Tavolo.objects.filter(attivo=True).aggregate(tot=Sum("capienza"))["tot"] or 0
+    prenotazioni_giorno = (
+        Prenotazione.objects.filter(data=data_scelta)
+        .exclude(stato=Prenotazione.STATO_ANNULLATA)
+        .order_by("ora")
+    )
+    posti_prenotati = prenotazioni_giorno.aggregate(tot=Sum("numero_coperti"))["tot"] or 0
+    posti_liberi = max(posti_totali - posti_prenotati, 0)
+
+    return render(
+        request,
+        "prenotazioni/disponibilita.html",
+        {
+            "data_scelta": data_scelta,
+            "posti_totali": posti_totali,
+            "posti_prenotati": posti_prenotati,
+            "posti_liberi": posti_liberi,
+            "prenotazioni_giorno": prenotazioni_giorno,
         },
     )

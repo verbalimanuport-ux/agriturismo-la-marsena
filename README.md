@@ -998,7 +998,43 @@ sfondo colorato acceso — solo testo semplice ed elegante, coerente con lo stil
 scritta a mano" della cornice sottile. Il banner del prezzo del menù fisso in alto resta
 invece con il suo risalto: è un annuncio unico, non un'etichetta ripetuta su ogni riga.
 
-## 66. Prossimo passo
+## 67. Stato "Previsto" separato, Posti rimasti, capienza in Sala, tavoli ruotabili
+
+⚠️ **1 nuova migrazione** (solo `prenotazioni`, il campo `ruotato` sul Tavolo):
+
+```
+python manage.py migrate
+```
+
+### 🟡 "Previsto" e "In preparazione" finalmente distinti ovunque
+Il colore arancione "In cucina" veniva usato sia per i giri ancora in attesa del via
+libera sia per quelli davvero partiti — fuorviante, l'hai segnalato giusto guardando la
+Sala. Ora sono due stati distinti, con colore diverso, coerenti in **Sala, Mappa e
+striscia Cucina**:
+- **Giallo/oro "Previsto"**: "⏳ In attesa del via libera · Giro X" — il cameriere non ha
+  ancora dato il via, la cucina non deve muoversi
+- **Arancione "In preparazione"** (rinominato da "In cucina"): via libera già dato, il
+  cuoco ci sta davvero lavorando
+
+`Ordine.stato_sala` ora riusa la stessa logica già usata per il testo del giro
+(`giro_in_evidenza`), invece di ricalcolarla separatamente — colore e testo non potranno
+più disallinearsi in futuro.
+
+### 📊 Posti rimasti per data
+Nuova pagina staff (menu Staff → **"Posti rimasti"**): scegli una data, vedi posti totali,
+già prenotati, e liberi stimati. È una stima semplice (capienza totale meno coperti
+prenotati quel giorno) — non tiene conto di eventuali doppi turni sullo stesso tavolo
+nella stessa sera, per un servizio a turno unico va benissimo.
+
+### 🪑 Capienza visibile in Sala
+Sotto il numero di ogni tavolo, ora si legge quanti posti ha ("4 posti").
+
+### ⟲ Tavoli ruotabili sulla Mappa
+In modalità "Modifica disposizione", ogni tavolo ha ora un piccolo pulsante **"⟲"** che lo
+ruota (scambia larghezza/altezza) — utile per un tavolo grande da posizionare di traverso
+rispetto agli altri. La rotazione si salva insieme alla posizione.
+
+## 68. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.

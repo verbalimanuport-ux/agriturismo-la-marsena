@@ -643,7 +643,7 @@ def mappa_tavoli(request):
                 tavolo_id = int(t.get("id"))
             except (TypeError, ValueError):
                 continue
-            Tavolo.objects.filter(id=tavolo_id).update(pos_x=x, pos_y=y)
+            Tavolo.objects.filter(id=tavolo_id).update(pos_x=x, pos_y=y, ruotato=bool(t.get("ruotato")))
 
         punti_validi = []
         for p in dati.get("perimetro", []):
@@ -677,6 +677,7 @@ def mappa_tavoli(request):
                 "capienza": t.capienza,
                 "x": x,
                 "y": y,
+                "ruotato": t.ruotato,
                 "stato_sala": d["stato_sala"],
                 "pronti": d["pronti"],
                 "giro": d["giro"],

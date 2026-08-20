@@ -246,11 +246,13 @@ class Ordine(models.Model):
 
     @property
     def stato_sala(self):
-        """Stato sintetico a 6 valori per colorare il tavolo in Sala/Cucina/
-        Mappa (il settimo colore, 'libero', si applica quando non c'è nessun
+        """Stato sintetico a 7 valori per colorare il tavolo in Sala/Cucina/
+        Mappa (l'ottavo colore, 'libero', si applica quando non c'è nessun
         ordine aperto — non serve calcolarlo qui, lo decide chi chiama).
         Parla SOLO del cibo (categorie che richiedono cucina): le bevande
-        hanno una casellina separata, non influenzano mai questo colore."""
+        hanno una casellina separata, non influenzano mai questo colore.
+        Riusa `giro_in_evidenza` per "previsto" vs "in_preparazione", così i
+        due non vanno mai fuori sincrono tra colore e testo mostrato."""
         righe = [r for r in self.righe.all() if r.piatto.categoria.richiede_cucina]
         if not righe:
             return "in_attesa_ordini"
@@ -258,11 +260,12 @@ class Ordine(models.Model):
             return "pronto"
         if all(r.stato == RigaOrdine.STATO_SERVITO for r in righe):
             return "completo"
-        # Qualcosa è già attivo o previsto: quello ha sempre priorità su un
-        # "appena servito" precedente, altrimenti il tavolo resta bloccato su
-        # un colore vecchio anche quando è arrivata una comanda nuova.
-        if any(r.stato in (RigaOrdine.STATO_PREVISTO, RigaOrdine.STATO_IN_ATTESA) for r in righe):
-            return "in_cucina"
+        giro = self.giro_in_evidenza
+        if giro is not None:
+            if giro["stato"] == "in_cucina":
+                return "in_preparazione"
+            if giro["stato"] == "previsto":
+                return "previsto"
         adesso = timezone.now()
         appena_servite = any(
             r.stato == RigaOrdine.STATO_SERVITO

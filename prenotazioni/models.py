@@ -19,6 +19,11 @@ class Tavolo(models.Model):
     pos_y = models.FloatField(
         null=True, blank=True, verbose_name="Posizione Y sulla mappa (%)"
     )
+    ruotato = models.BooleanField(
+        default=False,
+        verbose_name="Ruotato (verticale invece di orizzontale)",
+        help_text="Utile per un tavolo grande che deve stare posizionato di traverso rispetto agli altri.",
+    )
 
     class Meta:
         verbose_name = "Tavolo"
