@@ -50,7 +50,7 @@
             <span class="badge d-block mt-1 badge-info" style="background-color: var(--color-appena-servito);">🥤 servite</span>
           {% endif %}
           {% if dato.ultimo_giro_servito %}
-            <span class="badge d-block mt-1 badge-info" style="background-color: var(--color-primary);">✓ Servito G{{ dato.ultimo_giro_servito }}</span>
+            <span class="badge d-block mt-1 badge-info" style="background-color: var(--color-primary);">✓ Servito G{{ dato.ultimo_giro_servito.numero }}{% if not dato.ultimo_giro_servito.completo %} ({{ dato.ultimo_giro_servito.serviti }}/{{ dato.ultimo_giro_servito.totale }}){% endif %}</span>
           {% endif %}
         </div>
       </div>

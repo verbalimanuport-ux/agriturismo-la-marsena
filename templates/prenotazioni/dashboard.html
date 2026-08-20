@@ -77,7 +77,7 @@
             <select name="tavolo_id" class="form-select form-select-sm" style="width:auto;" required>
               <option value="">Tavolo…</option>
               {% for t in tavoli_attivi %}
-                <option value="{{ t.id }}">{{ t.numero }}</option>
+                <option value="{{ t.id }}">{{ t.numero }} — {{ t.capienza }} post{{ t.capienza|pluralize:"o,i" }}</option>
               {% endfor %}
             </select>
             <button type="submit" class="btn btn-sm btn-outline-success">Assegna</button>

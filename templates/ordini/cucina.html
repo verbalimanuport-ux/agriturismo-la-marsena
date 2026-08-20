@@ -22,7 +22,7 @@
           <div class="small mt-1 px-1" style="background-color: var(--color-appena-servito); color:#fff; border-radius:6px;">🥤 servite</div>
         {% endif %}
         {% if dato.ultimo_giro_servito %}
-          <div class="small mt-1 px-1" style="background-color: var(--color-primary); color:#fff; border-radius:6px;">✓ Servito G{{ dato.ultimo_giro_servito }}</div>
+          <div class="small mt-1 px-1" style="background-color: var(--color-primary); color:#fff; border-radius:6px;">✓ Servito G{{ dato.ultimo_giro_servito.numero }}{% if not dato.ultimo_giro_servito.completo %} ({{ dato.ultimo_giro_servito.serviti }}/{{ dato.ultimo_giro_servito.totale }}){% endif %}</div>
         {% endif %}
       </div>
     {% endfor %}
