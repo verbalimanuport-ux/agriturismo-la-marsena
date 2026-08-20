@@ -65,6 +65,8 @@ def _invia_notifiche_email(prenotazione):
                     f"Data: {data_str}\n"
                     f"Ora: {ora_str}\n"
                     f"Persone: {prenotazione.numero_coperti}\n"
+                    f"Di cui bambini: {prenotazione.numero_bambini}\n"
+                    f"Seggioloni richiesti: {prenotazione.numero_seggioloni}\n"
                     f"Telefono: {prenotazione.telefono or '-'}\n"
                     f"Email: {prenotazione.email or '-'}\n"
                     f"Note: {prenotazione.note or '-'}\n"

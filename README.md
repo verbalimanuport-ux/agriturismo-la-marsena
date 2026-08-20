@@ -1034,7 +1034,37 @@ In modalità "Modifica disposizione", ogni tavolo ha ora un piccolo pulsante **"
 ruota (scambia larghezza/altezza) — utile per un tavolo grande da posizionare di traverso
 rispetto agli altri. La rotazione si salva insieme alla posizione.
 
-## 68. Prossimo passo
+## 69. Quattro correzioni dopo i test — email, capienza, servito parziale, alla romana nel fisso
+
+Nessuna nuova migrazione — solo logica e visualizzazione.
+
+### 📧 Email prenotazione con bambini/seggioloni
+La mail che arriva allo staff quando arriva una nuova prenotazione ora include anche
+"Di cui bambini" e "Seggioloni richiesti" — prima erano stati aggiunti al modulo ma
+dimenticati nel testo della mail.
+
+### 🪑 Capienza visibile anche nella dashboard prenotazioni
+Il menù a tendina per assegnare un tavolo a una prenotazione ora mostra anche i posti
+("Tavolo 3 — 4 posti"), non solo il numero — prima c'era solo in Sala.
+
+### ✓ Servito parziale, giro per giro
+La casellina "Servito Gx" ora riflette il progresso REALE quando un giro ha più piatti
+diversi: se un giro ha due primi diversi e solo uno è stato consegnato, compare
+**"✓ Servito G2 (1/2)"** — diventa "✓ Servito G2" pulito solo quando entrambi sono fatti.
+Mostra sempre il giro più avanzato con del progresso, qualunque sia il suo numero.
+
+### 🍽️👶 "Alla romana" ora funziona anche nel menù fisso, con bambini
+Prima il calcolatore "Dividi alla romana" era disponibile solo per il menù alla carta —
+nel fisso, con prezzi diversi tra adulti e bambini, la "divisione in parti uguali" non
+bastava più a essere giusta (es. tavolo da 4 con 1 bambino: una coppia vuole pagare 2
+quote adulto + quella del bambino).
+
+Ora il calcolatore compare anche nel fisso, con **"Menù Adulto"** e **"Menù Bambino"**
+come voci assegnabili (ciascuna al proprio prezzo), esattamente come i piatti nella
+carta — stesso strumento, stesso modo di usarlo, solo con quote invece di pietanze. La
+"divisione in parti uguali" resta comunque disponibile per chi vuole un calcolo veloce.
+
+## 70. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.

@@ -715,7 +715,6 @@ def preconto(request, ordine_id):
     # Righe fatturate a prezzo singolo (carta, vini, bibite...) — uso la
     # modalità CONGELATA di questo conto, non quella del menù attivo ora.
     modalita_fissa = ordine.modalita_effettiva == Menu.MODALITA_FISSO
-    modalita_solo_carta = ordine.modalita_effettiva == Menu.MODALITA_CARTA
     voci_singole = []
     coperti_menu_fisso_adulti = 0
     coperti_menu_fisso_bambini = 0
@@ -737,12 +736,34 @@ def preconto(request, ordine_id):
     dividi_per = max(1, min(dividi_per, 50))
     quota = (totale / dividi_per) if dividi_per else totale
 
-    # Dati per il calcolatore "Alla romana": disponibile solo in modalità
-    # "solo carta" (nel fisso non ha senso, si mangia tutti uguale). Tutto
-    # passa da json.dumps, MAI interpolato direttamente nel codice JS: con
+    # Dati per il calcolatore "Alla romana": nel fisso le "voci" da
+    # distribuire non sono piatti singoli (non esistono, è un prezzo a
+    # testa) ma QUOTE — una per ogni adulto, una per ogni bambino — più gli
+    # eventuali extra/sempre-a-parte come voci normali. Tutto passa da
+    # json.dumps, MAI interpolato direttamente nel codice JS: con
     # LANGUAGE_CODE italiano, Django scriverebbe i decimali con la virgola
     # (es. "3,50"), che spacca la sintassi JavaScript.
-    voci_romana = [
+    voci_romana = []
+    if modalita_fissa:
+        if coperti_menu_fisso_adulti:
+            voci_romana.append(
+                {
+                    "id": "quota_adulto",
+                    "nome": "Menù Adulto",
+                    "quantita": coperti_menu_fisso_adulti,
+                    "prezzo_unitario": float(ordine.prezzo_fisso_effettivo),
+                }
+            )
+        if coperti_menu_fisso_bambini:
+            voci_romana.append(
+                {
+                    "id": "quota_bambino",
+                    "nome": "Menù Bambino",
+                    "quantita": coperti_menu_fisso_bambini,
+                    "prezzo_unitario": float(ordine.prezzo_bambini_effettivo),
+                }
+            )
+    voci_romana += [
         {
             "id": r.id,
             "nome": r.piatto.nome,
@@ -771,7 +792,7 @@ def preconto(request, ordine_id):
             "totale": totale,
             "dividi_per": dividi_per,
             "quota": quota,
-            "modalita_solo_carta": modalita_solo_carta,
+            "mostra_alla_romana": bool(voci_romana),
             "dati_romana_json": json.dumps(dati_romana),
             "adesso": timezone.now(),
         },

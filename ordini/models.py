@@ -307,30 +307,36 @@ class Ordine(models.Model):
 
     @property
     def ultimo_giro_servito(self):
-        """Il numero del giro più alto che è stato COMPLETAMENTE servito
-        (tutti i suoi piatti di cucina), da mostrare in una casellina a
-        parte finché non viene servito anche il giro successivo — a
-        differenza del colore "appena servito" per le bevande, questo NON
-        scade a tempo: tra una portata e l'altra può passare più di
-        qualche minuto, e l'informazione resterebbe comunque vera. None se
-        non c'è ancora nulla servito, o se è tutto servito (quel caso ha
-        già il suo colore/badge dedicato "Servizio completo")."""
+        """Il giro PIÙ AVANZATO che ha almeno un piatto servito, da mostrare
+        in una casellina a parte finché non inizia il progresso sul giro
+        successivo — a differenza del colore "appena servito" per le
+        bevande, questo NON scade a tempo: tra una portata e l'altra può
+        passare più di qualche minuto, e l'informazione resterebbe comunque
+        vera. Se quel giro ha più piatti diversi e non sono ancora tutti
+        serviti, restituisce anche quanti su quanti (es. "1 su 2"), così il
+        progresso parziale è visibile senza aspettare che l'intero giro sia
+        finito. None se non c'è ancora nulla servito, o se è tutto servito
+        (quel caso ha già il suo colore/badge dedicato "Servizio completo")."""
         righe_cucina = [r for r in self.righe.all() if r.piatto.categoria.richiede_cucina]
         if not righe_cucina:
+            return None
+        if all(r.stato == RigaOrdine.STATO_SERVITO for r in righe_cucina):
             return None
         per_giro = {}
         for r in righe_cucina:
             per_giro.setdefault(r.portata, []).append(r)
-        giri_serviti = [
+        giri_con_progresso = [
             numero
             for numero, righe_giro in per_giro.items()
-            if all(r.stato == RigaOrdine.STATO_SERVITO for r in righe_giro)
+            if any(r.stato == RigaOrdine.STATO_SERVITO for r in righe_giro)
         ]
-        if not giri_serviti:
+        if not giri_con_progresso:
             return None
-        if all(r.stato == RigaOrdine.STATO_SERVITO for r in righe_cucina):
-            return None
-        return max(giri_serviti)
+        numero = max(giri_con_progresso)
+        righe_giro = per_giro[numero]
+        serviti = sum(1 for r in righe_giro if r.stato == RigaOrdine.STATO_SERVITO)
+        totale = len(righe_giro)
+        return {"numero": numero, "serviti": serviti, "totale": totale, "completo": serviti == totale}
 
 
 class RigaOrdine(models.Model):
