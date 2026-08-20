@@ -52,21 +52,28 @@
 
   <table class="table table-sm mb-3">
     <tbody>
-      {% if coperti_menu_fisso %}
+      {% if coperti_menu_fisso_adulti %}
       <tr>
         <td>Menù fisso</td>
-        <td class="text-center" style="white-space:nowrap;">{{ coperti_menu_fisso }} ×</td>
+        <td class="text-center" style="white-space:nowrap;">{{ coperti_menu_fisso_adulti }} ×</td>
         <td class="text-end" style="white-space:nowrap;">&euro;{{ prezzo_fisso }}</td>
+      </tr>
+      {% endif %}
+      {% if coperti_menu_fisso_bambini %}
+      <tr>
+        <td>Menù bambini 👶</td>
+        <td class="text-center" style="white-space:nowrap;">{{ coperti_menu_fisso_bambini }} ×</td>
+        <td class="text-end" style="white-space:nowrap;">&euro;{{ prezzo_bambini }}</td>
       </tr>
       {% endif %}
       {% for riga in voci_singole %}
       <tr>
-        <td>{{ riga.piatto.nome }}{% if riga.extra_a_pagamento %} <span class="text-muted small">(a pagamento)</span>{% endif %}</td>
+        <td>{{ riga.piatto.nome }}{% if riga.extra_a_pagamento %} <span class="text-muted small">(a pagamento)</span>{% endif %}{% if riga.per_bambini %} <span class="text-muted small">👶</span>{% endif %}</td>
         <td class="text-center" style="white-space:nowrap;">{{ riga.quantita }} ×</td>
         <td class="text-end" style="white-space:nowrap;">&euro;{{ riga.subtotale }}</td>
       </tr>
       {% empty %}
-        {% if not coperti_menu_fisso %}
+        {% if not coperti_menu_fisso_adulti and not coperti_menu_fisso_bambini %}
         <tr><td colspan="3" class="text-center text-muted">Nessuna consumazione registrata.</td></tr>
         {% endif %}
       {% endfor %}

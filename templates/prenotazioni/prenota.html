@@ -53,6 +53,15 @@
       {{ form.numero_coperti }}
       {% for errore in form.numero_coperti.errors %}<div class="text-danger small">{{ errore }}</div>{% endfor %}
     </div>
+    <div class="col-md-4">
+      <label class="form-label">Di cui bambini</label>
+      {{ form.numero_bambini }}
+    </div>
+    <div class="col-md-4" id="campoSeggioloni" style="display:none;">
+      <label class="form-label">Seggioloni richiesti</label>
+      {{ form.numero_seggioloni }}
+      <p class="text-muted small mt-1 mb-0">Così possiamo prepararli prima del vostro arrivo.</p>
+    </div>
     <div class="col-12">
       <label class="form-label">Note (allergie, richieste particolari...)</label>
       {{ form.note }}
@@ -71,4 +80,17 @@
   <button type="submit" class="btn btn-success mt-4">Invia prenotazione</button>
 </form>
 </div>
+
+<script>
+(function () {
+  var campoBambini = document.getElementById('{{ form.numero_bambini.id_for_label }}');
+  var campoSeggioloni = document.getElementById('campoSeggioloni');
+  function aggiorna() {
+    var valore = parseInt(campoBambini.value || '0', 10);
+    campoSeggioloni.style.display = valore > 0 ? 'block' : 'none';
+  }
+  campoBambini.addEventListener('input', aggiorna);
+  aggiorna();
+})();
+</script>
 {% endblock %}

@@ -15,14 +15,20 @@
   </div>
 {% endif %}
 
-<form method="post" class="row g-2 align-items-end mb-2" style="max-width:350px;">
+<form method="post" class="row g-2 align-items-end mb-2" style="max-width:500px;">
   {% csrf_token %}
   <input type="hidden" name="azione" value="aggiorna_coperti">
-  <div class="col-8">
+  <div class="col-6">
     <label class="form-label">Numero coperti (persone al tavolo)</label>
     <input type="number" name="numero_coperti" min="1" value="{{ ordine.numero_coperti }}" class="form-control">
   </div>
-  <div class="col-4">
+  {% if ordine.menu_applicato.bambini_disponibile %}
+    <div class="col-3">
+      <label class="form-label">Di cui bambini</label>
+      <input type="number" name="numero_bambini" min="0" value="{{ ordine.numero_bambini }}" class="form-control">
+    </div>
+  {% endif %}
+  <div class="col-3">
     <button type="submit" class="btn btn-outline-success w-100">Aggiorna</button>
   </div>
 </form>
@@ -31,6 +37,10 @@
     Con il menù fisso attivo, impostare/aggiornare i coperti genera automaticamente
     tutte le portate del menù fisso qui sotto, come bozza (anche se una categoria ha
     più piatti, es. 2 antipasti: escono entrambi per tutti).
+    {% if ordine.menu_applicato.bambini_disponibile %}
+      Il menù bambini è attivo per questa edizione: i coperti "di cui bambini" ricevono
+      anche le portate dedicate.
+    {% endif %}
   </p>
 {% else %}
   <div class="mb-4"></div>
@@ -73,7 +83,7 @@
               <input type="number" name="quantita_riga_{{ riga.id }}" min="0" value="{{ riga.quantita }}"
                      class="form-control form-control-sm campo-auto" data-riga="{{ riga.id }}" data-campo="quantita" style="width:70px;">
             </td>
-            <td>{{ riga.piatto.nome }}{% if not riga.piatto.categoria.richiede_cucina %} <span class="text-muted small">(extra)</span>{% endif %}</td>
+            <td>{{ riga.piatto.nome }}{% if not riga.piatto.categoria.richiede_cucina %} <span class="text-muted small">(extra)</span>{% endif %}{% if riga.per_bambini %} <span class="text-muted small">👶 bambini</span>{% endif %}</td>
             <td>
               {% if riga.piatto.categoria.richiede_cucina %}
                 <input type="number" name="portata_riga_{{ riga.id }}" min="1" value="{{ riga.portata }}"
@@ -155,7 +165,7 @@
       {% for riga in giro.righe %}
       <tr style="{% if riga.stato == 'previsto' %}opacity:0.55;{% elif riga.stato == 'in_attesa' %}background-color: rgba(47,168,79,0.07);{% endif %}">
         <td>{{ riga.quantita }}</td>
-        <td>{{ riga.piatto.nome }}{% if riga.extra_a_pagamento %} <span class="text-muted small">(a pagamento)</span>{% endif %}</td>
+        <td>{{ riga.piatto.nome }}{% if riga.extra_a_pagamento %} <span class="text-muted small">(a pagamento)</span>{% endif %}{% if riga.per_bambini %} <span class="text-muted small">👶 bambini</span>{% endif %}</td>
         <td>{{ riga.note|default:"—" }}</td>
         <td>{{ riga.inviato_da.username|default:riga.get_origine_display }}</td>
         <td>
@@ -217,6 +227,9 @@
     <p class="fs-4 fw-bold mb-0">Totale: &euro;{{ ordine.totale }}</p>
     {% if ordine.totale_coperto %}
       <p class="small mb-0" style="color: var(--color-muted);">di cui coperto (&times;{{ ordine.numero_coperti }}): &euro;{{ ordine.totale_coperto }}</p>
+    {% endif %}
+    {% if ordine.numero_bambini %}
+      <p class="small mb-0" style="color: var(--color-muted);">di cui {{ ordine.numero_bambini }} a menù bambini (&euro;{{ ordine.prezzo_bambini_effettivo }} cad.)</p>
     {% endif %}
   </div>
   <div class="d-flex gap-2 flex-wrap">

@@ -28,9 +28,10 @@
         <div class="small" style="color: var(--color-muted);">
           {{ p.telefono }}{% if p.email %} · {{ p.email }}{% endif %}
         </div>
-        {% if p.note or p.interesse_lezione_cavallo %}
+        {% if p.note or p.interesse_lezione_cavallo or p.numero_bambini %}
           <div class="small mt-1">
             {% if p.interesse_lezione_cavallo %}<span class="badge" style="background-color: var(--color-accent-soft); color: var(--color-accent-dark);">🐴 Lezione a cavallo</span>{% endif %}
+            {% if p.numero_bambini %}<span class="badge" style="background-color: var(--color-in-attesa-ordini); color:#fff;">👶 {{ p.numero_bambini }}{% if p.numero_seggioloni %} · 🪑 {{ p.numero_seggioloni }}{% endif %}{% if p.bambini_menu_dedicato %} · menù dedicato{% elif p.bambini_menu_dedicato == False %} · menù normale{% endif %}</span>{% endif %}
             {% if p.note %}<span style="color: var(--color-muted);">{{ p.note }}</span>{% endif %}
           </div>
         {% endif %}
@@ -121,6 +122,9 @@
       <td class="py-3">
         <div class="fw-semibold">{{ p.nome }}</div>
         <div class="small" style="color: var(--color-muted);">{{ p.telefono }}</div>
+        {% if p.numero_bambini %}
+          <span class="badge small mt-1" style="background-color: var(--color-in-attesa-ordini); color:#fff;">👶 {{ p.numero_bambini }}{% if p.numero_seggioloni %} · 🪑 {{ p.numero_seggioloni }}{% endif %}</span>
+        {% endif %}
       </td>
       <td class="py-3 text-center fw-bold">{{ p.numero_coperti }}</td>
       <td class="py-3 text-center">
