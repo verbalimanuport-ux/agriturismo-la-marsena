@@ -38,6 +38,14 @@ class Ordine(models.Model):
         verbose_name="Numero coperti",
         help_text="Persone al tavolo: usato per calcolare il conto del menù fisso.",
     )
+    numero_bambini = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Di cui a menù bambini",
+        help_text=(
+            "Quanti dei coperti mangiano dal menù bambini (prezzo dedicato, portate "
+            "dedicate) — visibile solo quando il menù attivo ha il menù bambini acceso."
+        ),
+    )
     prezzo_menu_fisso_applicato = models.DecimalField(
         max_digits=6,
         decimal_places=2,
@@ -48,6 +56,14 @@ class Ordine(models.Model):
             "Congelato all'apertura del tavolo: se il prezzo del menù fisso viene "
             "cambiato a metà servizio, i conti già aperti non cambiano."
         ),
+    )
+    prezzo_menu_bambini_applicato = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Prezzo menù bambini applicato",
+        help_text="Congelato all'apertura del tavolo, come il prezzo del menù adulti.",
     )
     modalita_applicata = models.CharField(
         max_length=10,
@@ -101,12 +117,14 @@ class Ordine(models.Model):
             return ordine
         menu_attivo = Menu.ottieni_attivo()
         prezzo_fisso = menu_attivo.prezzo_menu_fisso_a_persona if menu_attivo else 0
+        prezzo_bambini = menu_attivo.prezzo_menu_bambini_a_persona if menu_attivo else 0
         modalita = menu_attivo.modalita_attiva if menu_attivo else Menu.MODALITA_CARTA
         ordine, _creato = cls.objects.get_or_create(
             tavolo=tavolo,
             stato=cls.STATO_APERTO,
             defaults={
                 "prezzo_menu_fisso_applicato": prezzo_fisso,
+                "prezzo_menu_bambini_applicato": prezzo_bambini,
                 "modalita_applicata": modalita,
                 "menu_applicato": menu_attivo,
             },
@@ -122,6 +140,16 @@ class Ordine(models.Model):
             return self.prezzo_menu_fisso_applicato
         menu_attivo = Menu.ottieni_attivo()
         return menu_attivo.prezzo_menu_fisso_a_persona if menu_attivo else 0
+
+    @property
+    def prezzo_bambini_effettivo(self):
+        """Il prezzo a persona del menù bambini da usare per questo conto:
+        quello congelato all'apertura, o quello attuale per i conti
+        precedenti a questa funzione."""
+        if self.prezzo_menu_bambini_applicato is not None:
+            return self.prezzo_menu_bambini_applicato
+        menu_attivo = Menu.ottieni_attivo()
+        return menu_attivo.prezzo_menu_bambini_a_persona if menu_attivo else 0
 
     @property
     def modalita_effettiva(self):
@@ -151,25 +179,35 @@ class Ordine(models.Model):
         righe = list(self.righe.all())
 
         if self.modalita_effettiva != Menu.MODALITA_FISSO:
-            # In "Carta" o "Entrambi" tutto si fattura a prezzo singolo,
-            # anche i piatti etichettati "menù fisso" (es. quando una volta
-            # ogni tanto si decide che tutto il menù è à la carte).
+            # In "Carta" tutto si fattura a prezzo singolo, anche i piatti
+            # etichettati "menù fisso" (es. quando una volta ogni tanto si
+            # decide che tutto il menù è à la carte).
             totale_piatti = sum((r.subtotale for r in righe), start=0)
         else:
             # Modalità "Solo menù fisso": i piatti fissi entrano nel calcolo a
-            # persona, tutto il resto (sempre a parte, o segnato "extra a
-            # pagamento" — es. una seconda Panna Cotta) a prezzo singolo.
+            # persona (adulti e bambini separati, prezzi diversi), tutto il
+            # resto (sempre a parte, o segnato "extra a pagamento" — es. una
+            # seconda Panna Cotta) a prezzo singolo.
             totale_a_prezzo_singolo = sum(
                 (r.subtotale for r in righe if r.piatto.categoria.sempre_a_parte or r.extra_a_pagamento),
                 start=0,
             )
-            ha_piatti_fissi = any(
-                not r.piatto.categoria.sempre_a_parte and not r.extra_a_pagamento for r in righe
-            )
-            totale_fisso = 0
-            if ha_piatti_fissi:
-                totale_fisso = self.numero_coperti * self.prezzo_fisso_effettivo
-            totale_piatti = totale_fisso + totale_a_prezzo_singolo
+            righe_a_persona = [
+                r for r in righe if not r.piatto.categoria.sempre_a_parte and not r.extra_a_pagamento
+            ]
+            ha_piatti_adulti = any(not r.per_bambini for r in righe_a_persona)
+            ha_piatti_bambini = any(r.per_bambini for r in righe_a_persona)
+
+            totale_fisso_adulti = 0
+            if ha_piatti_adulti:
+                numero_adulti = max(self.numero_coperti - self.numero_bambini, 0)
+                totale_fisso_adulti = numero_adulti * self.prezzo_fisso_effettivo
+
+            totale_fisso_bambini = 0
+            if ha_piatti_bambini:
+                totale_fisso_bambini = self.numero_bambini * self.prezzo_bambini_effettivo
+
+            totale_piatti = totale_fisso_adulti + totale_fisso_bambini + totale_a_prezzo_singolo
 
         return totale_piatti + self.totale_coperto
 
@@ -347,6 +385,11 @@ class RigaOrdine(models.Model):
             "se il resto del tavolo è a menù fisso (es. una seconda Panna Cotta oltre a "
             "quella già inclusa)."
         ),
+    )
+    per_bambini = models.BooleanField(
+        default=False,
+        verbose_name="Piatto del menù bambini",
+        help_text="Generato dal menù bambini dell'edizione attiva: conteggiato al prezzo bambini, non a quello adulti.",
     )
 
     class Meta:

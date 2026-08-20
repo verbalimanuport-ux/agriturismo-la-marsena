@@ -18,6 +18,9 @@ class PrenotazioneAdmin(admin.ModelAdmin):
         "data",
         "ora",
         "numero_coperti",
+        "numero_bambini",
+        "numero_seggioloni",
+        "bambini_menu_dedicato",
         "tavolo",
         "stato",
         "interesse_lezione_cavallo",
@@ -25,7 +28,7 @@ class PrenotazioneAdmin(admin.ModelAdmin):
         "email",
         "creata_il",
     )
-    list_editable = ("tavolo", "stato")
+    list_editable = ("tavolo", "stato", "bambini_menu_dedicato")
     list_filter = ("stato", "data", "interesse_lezione_cavallo")
     search_fields = ("nome", "telefono", "email", "note")
     date_hierarchy = "data"

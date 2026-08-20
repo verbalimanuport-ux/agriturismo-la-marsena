@@ -11,11 +11,9 @@ class Menu(models.Model):
 
     MODALITA_FISSO = "fisso"
     MODALITA_CARTA = "carta"
-    MODALITA_ENTRAMBI = "entrambi"
     MODALITA_CHOICES = [
         (MODALITA_FISSO, "Solo menù fisso"),
         (MODALITA_CARTA, "Solo carta"),
-        (MODALITA_ENTRAMBI, "Entrambi visibili"),
     ]
 
     nome = models.CharField(max_length=150, verbose_name="Nome del menù")
@@ -55,6 +53,27 @@ class Menu(models.Model):
         verbose_name="Piatti in questo menù",
         help_text="Spunta i piatti che vuoi far comparire in questa edizione.",
     )
+    menu_bambini_attivo = models.BooleanField(
+        default=True,
+        verbose_name="Menù bambini attivo",
+        help_text=(
+            "Ha effetto solo quando la modalità è 'Solo menù fisso' (acceso di default: "
+            "spegnilo per questa edizione se non vuoi offrirlo)."
+        ),
+    )
+    prezzo_menu_bambini_a_persona = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=0,
+        verbose_name="Prezzo menù bambini a persona (EUR)",
+    )
+    piatti_bambini = models.ManyToManyField(
+        "Piatto",
+        blank=True,
+        related_name="menus_bambini",
+        verbose_name="Piatti del menù bambini",
+        help_text="I piatti dedicati al menù bambini di questa edizione (un percorso a parte).",
+    )
 
     class Meta:
         verbose_name = "Menù"
@@ -75,14 +94,45 @@ class Menu(models.Model):
     def ottieni_attivo(cls):
         return cls.objects.filter(attivo=True).first()
 
+    @property
+    def bambini_disponibile(self):
+        """Il menù bambini è davvero utilizzabile solo se attivo E siamo in
+        modalità 'Solo menù fisso' (in carta non ha senso: un bambino
+        ordina semplicemente quello che vuole dalla carta normale)."""
+        return self.menu_bambini_attivo and self.modalita_attiva == self.MODALITA_FISSO
+
 
 class Categoria(models.Model):
     """Es. Antipasti, Primi, Secondi, Dolci, Vini... CONDIVISA tra tutti i
     menù: la struttura (che categorie esistono) è sempre la stessa, non
     serve ricrearla per ogni nuova edizione — cambiano solo i piatti dentro."""
 
+    RUOLO_PORTATA = "portata"
+    RUOLO_VINI = "vini"
+    RUOLO_DOLCI = "dolci"
+    RUOLO_BEVANDE = "bevande"
+    RUOLO_CHOICES = [
+        (RUOLO_PORTATA, "Portata (nel menù principale)"),
+        (RUOLO_VINI, "Vini"),
+        (RUOLO_DOLCI, "Dolci"),
+        (RUOLO_BEVANDE, "Bevande (incl. caffè e digestivi)"),
+    ]
+
     nome = models.CharField(max_length=100, verbose_name="Nome categoria")
     ordine = models.PositiveIntegerField(default=0, verbose_name="Ordine di visualizzazione")
+    ruolo = models.CharField(
+        max_length=10,
+        choices=RUOLO_CHOICES,
+        default=RUOLO_PORTATA,
+        verbose_name="Ruolo nel menù",
+        help_text=(
+            "Decide DOVE compare questa categoria nel menù pubblico: 'Portata' resta nella "
+            "pagina principale, le altre tre finiscono ciascuna nella propria pagina dedicata "
+            "(raggiungibile con un pulsante). Puoi avere più categorie con lo stesso ruolo "
+            "(es. 'Vini Rossi', 'Vini Bianchi', 'Vini Bollicine' tutte con ruolo Vini): "
+            "compariranno insieme, ciascuna con il proprio titolo."
+        ),
+    )
     richiede_cucina = models.BooleanField(
         default=True,
         verbose_name="Richiede cucina",
@@ -136,8 +186,8 @@ class ImpostazioniMenu(models.Model):
         verbose_name="Applica il coperto",
         help_text=(
             "Nel menù fisso il coperto non si aggiunge mai come voce a parte (si "
-            "considera già incluso nel prezzo). Nella carta e in 'Entrambi visibili', "
-            "se acceso, si aggiunge come voce separata nel conto."
+            "considera già incluso nel prezzo). Nella carta, se acceso, si aggiunge "
+            "come voce separata nel conto."
         ),
     )
     prezzo_coperto = models.DecimalField(
@@ -212,19 +262,21 @@ class Piatto(models.Model):
         return cls.objects.filter(sempre_a_parte | nel_menu).distinct()
 
 
-def categorie_con_piatti_per_menu(menu):
-    """Le categorie con almeno un piatto da mostrare per QUESTO menù,
-    ciascuna con l'elenco dei suoi piatti (attributo `piatti_attivi`): i
-    piatti spuntati per quel menù, PIÙ tutti quelli di categorie "sempre a
-    prezzo singolo" (Vini, Bibite...), che compaiono automaticamente in
-    ogni edizione. Usata sia dal menù pubblico sia dalla pagina QR in sola
-    consultazione, per non ripetere la stessa logica due volte."""
-    sempre_a_parte = models.Q(disponibile=True, categoria__sempre_a_parte=True)
+def _piatti_per_menu_e_ruolo(menu, ruolo):
+    """Piatti da mostrare per un dato Menù, filtrati alle categorie con
+    QUESTO ruolo (Portata/Vini/Dolci/Bevande): quelli spuntati per il menù,
+    PIÙ quelli di categorie "sempre a prezzo singolo", che compaiono
+    automaticamente in ogni edizione senza bisogno di spuntarli."""
+    sempre_a_parte = models.Q(disponibile=True, categoria__sempre_a_parte=True, categoria__ruolo=ruolo)
     if menu is None:
-        piatti = Piatto.objects.filter(sempre_a_parte).select_related("categoria")
-    else:
-        nel_menu = models.Q(disponibile=True, menus=menu)
-        piatti = Piatto.objects.filter(sempre_a_parte | nel_menu).distinct().select_related("categoria")
+        return Piatto.objects.filter(sempre_a_parte).select_related("categoria")
+    nel_menu = models.Q(disponibile=True, menus=menu, categoria__ruolo=ruolo)
+    return Piatto.objects.filter(sempre_a_parte | nel_menu).distinct().select_related("categoria")
+
+
+def _raggruppa_per_categoria(piatti):
+    """Da un elenco di piatti, le rispettive categorie ciascuna con
+    l'elenco dei suoi piatti nell'attributo `piatti_attivi`."""
     mappa = {}
     for piatto in piatti:
         voce = mappa.setdefault(piatto.categoria_id, {"categoria": piatto.categoria, "piatti": []})
@@ -235,3 +287,17 @@ def categorie_con_piatti_per_menu(menu):
         categorie.append(voce["categoria"])
     categorie.sort(key=lambda c: (c.ordine, c.nome))
     return categorie
+
+
+def categorie_con_piatti_per_menu(menu):
+    """Le categorie PORTATA (il menù principale — antipasti, primi,
+    secondi...) con almeno un piatto da mostrare per QUESTO menù. Usata sia
+    dal menù pubblico sia dalla pagina QR in sola consultazione, per non
+    ripetere la stessa logica due volte."""
+    return _raggruppa_per_categoria(_piatti_per_menu_e_ruolo(menu, Categoria.RUOLO_PORTATA))
+
+
+def categorie_per_ruolo(menu, ruolo):
+    """Le categorie di un ruolo specifico (Vini/Dolci/Bevande) per la loro
+    pagina pubblica dedicata."""
+    return _raggruppa_per_categoria(_piatti_per_menu_e_ruolo(menu, ruolo))

@@ -19,6 +19,8 @@ class PrenotazioneForm(forms.ModelForm):
             "data",
             "ora",
             "numero_coperti",
+            "numero_bambini",
+            "numero_seggioloni",
             "note",
             "interesse_lezione_cavallo",
         ]
@@ -29,6 +31,8 @@ class PrenotazioneForm(forms.ModelForm):
             "data": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
             "ora": forms.TimeInput(attrs={"class": "form-control", "type": "time"}),
             "numero_coperti": forms.NumberInput(attrs={"class": "form-control", "min": 1}),
+            "numero_bambini": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
+            "numero_seggioloni": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
             "note": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "interesse_lezione_cavallo": forms.CheckboxInput(
                 attrs={"class": "form-check-input"}

@@ -81,6 +81,25 @@ class Prenotazione(models.Model):
     data = models.DateField(verbose_name="Data")
     ora = models.TimeField(verbose_name="Ora")
     numero_coperti = models.PositiveIntegerField(verbose_name="Numero persone")
+    numero_bambini = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Di cui bambini",
+        help_text="Utile alla sala per organizzarsi, a prescindere da quale menù sarà attivo quel giorno.",
+    )
+    numero_seggioloni = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Seggioloni richiesti",
+    )
+    bambini_menu_dedicato = models.BooleanField(
+        null=True,
+        blank=True,
+        default=None,
+        verbose_name="Bambini al menù dedicato?",
+        help_text=(
+            "Da decidere alla telefonata di conferma (solo se quel giorno il menù bambini "
+            "è attivo): sì, no, o non ancora deciso."
+        ),
+    )
     note = models.TextField(blank=True, verbose_name="Note (allergie, richieste...)")
     interesse_lezione_cavallo = models.BooleanField(
         default=False,

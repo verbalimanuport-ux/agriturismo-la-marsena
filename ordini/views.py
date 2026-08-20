@@ -87,14 +87,14 @@ def _genera_portate_standard_se_fisso(ordine, utente):
     riga per OGNI piatto fisso disponibile DEL MENÙ COLLEGATO A QUESTO
     TAVOLO (congelato all'apertura, non quello attivo ora — se nel frattempo
     cambia il menù attivo, questo tavolo continua a generare le portate
-    giuste), con quantità pari ai coperti — nel menù fisso, di norma, tutti
-    i piatti fissi di una categoria (anche se sono più di uno, es. 2
-    antipasti) vengono serviti a tutti i coperti, non è una scelta tra
-    opzioni. Non tocca mai una riga già esistente verso il basso (non
-    cancella eccezioni già segnate dal cameriere) — al massimo la alza, se
-    sono aumentati i coperti. Le righe partono come "Da inviare": tocca al
-    cameriere premere "Invia in cucina" quando ha finito di comporre
-    l'ordine (note, extra ecc.)."""
+    giuste). Gli ADULTI (coperti meno i bambini) ricevono i piatti del menù
+    normale; se ci sono bambini E il menù bambini è attivo per questa
+    edizione, ricevono ANCHE i piatti dedicati del menù bambini. Non tocca
+    mai una riga già esistente verso il basso (non cancella eccezioni già
+    segnate dal cameriere) — al massimo la alza, se sono aumentati i
+    coperti. Le righe partono come "Da inviare": tocca al cameriere premere
+    "Invia in cucina" quando ha finito di comporre l'ordine (note, extra
+    ecc.)."""
     if ordine.modalita_effettiva != Menu.MODALITA_FISSO:
         return
 
@@ -102,25 +102,52 @@ def _genera_portate_standard_se_fisso(ordine, utente):
     if menu_di_riferimento is None:
         return
 
+    numero_adulti = max(ordine.numero_coperti - ordine.numero_bambini, 0)
+
     piatti_fissi = Piatto.objects.filter(
         menus=menu_di_riferimento, disponibile=True, categoria__sempre_a_parte=False
     ).select_related("categoria")
 
     for piatto in piatti_fissi:
-        riga = ordine.righe.filter(piatto=piatto).first()
+        riga = ordine.righe.filter(piatto=piatto, per_bambini=False).first()
         if riga is None:
+            if numero_adulti <= 0:
+                continue
             RigaOrdine.objects.create(
                 ordine=ordine,
                 piatto=piatto,
-                quantita=ordine.numero_coperti,
+                quantita=numero_adulti,
                 portata=piatto.categoria.ordine or 1,
                 origine=RigaOrdine.ORIGINE_STAFF,
                 inviato_da=utente,
                 stato=RigaOrdine.STATO_BOZZA,
             )
-        elif riga.quantita < ordine.numero_coperti:
-            riga.quantita = ordine.numero_coperti
+        elif riga.quantita < numero_adulti:
+            riga.quantita = numero_adulti
             riga.save()
+
+    # Menù bambini: solo se questa edizione lo prevede E ci sono bambini a
+    # questo tavolo. Piatti dedicati, non le stesse portate degli adulti.
+    if ordine.numero_bambini > 0 and menu_di_riferimento.bambini_disponibile:
+        piatti_bambini = menu_di_riferimento.piatti_bambini.filter(
+            disponibile=True
+        ).select_related("categoria")
+        for piatto in piatti_bambini:
+            riga = ordine.righe.filter(piatto=piatto, per_bambini=True).first()
+            if riga is None:
+                RigaOrdine.objects.create(
+                    ordine=ordine,
+                    piatto=piatto,
+                    quantita=ordine.numero_bambini,
+                    portata=piatto.categoria.ordine or 1,
+                    origine=RigaOrdine.ORIGINE_STAFF,
+                    inviato_da=utente,
+                    stato=RigaOrdine.STATO_BOZZA,
+                    per_bambini=True,
+                )
+            elif riga.quantita < ordine.numero_bambini:
+                riga.quantita = ordine.numero_bambini
+                riga.save()
 
 
 def ordina_tavolo(request, numero_tavolo):
@@ -393,8 +420,15 @@ def gestisci_tavolo(request, tavolo_id):
         elif azione == "aggiorna_coperti":
             try:
                 nuovi_coperti = int(request.POST.get("numero_coperti", ordine.numero_coperti))
+                nuovi_bambini_raw = request.POST.get("numero_bambini", "")
                 if nuovi_coperti > 0:
                     ordine.numero_coperti = nuovi_coperti
+                    if nuovi_bambini_raw != "":
+                        try:
+                            nuovi_bambini = max(0, min(int(nuovi_bambini_raw), nuovi_coperti))
+                            ordine.numero_bambini = nuovi_bambini
+                        except (TypeError, ValueError):
+                            pass
                     ordine.save()
                     _genera_portate_standard_se_fisso(ordine, request.user)
                     messages.success(request, f"Coperti aggiornati a {nuovi_coperti}.")
@@ -673,10 +707,14 @@ def preconto(request, ordine_id):
     modalita_fissa = ordine.modalita_effettiva == Menu.MODALITA_FISSO
     modalita_solo_carta = ordine.modalita_effettiva == Menu.MODALITA_CARTA
     voci_singole = []
-    coperti_menu_fisso = 0
+    coperti_menu_fisso_adulti = 0
+    coperti_menu_fisso_bambini = 0
     for r in righe:
         if modalita_fissa and not r.piatto.categoria.sempre_a_parte and not r.extra_a_pagamento:
-            coperti_menu_fisso = ordine.numero_coperti
+            if r.per_bambini:
+                coperti_menu_fisso_bambini = ordine.numero_bambini
+            else:
+                coperti_menu_fisso_adulti = max(ordine.numero_coperti - ordine.numero_bambini, 0)
             continue
         voci_singole.append(r)
 
@@ -715,8 +753,10 @@ def preconto(request, ordine_id):
             "ordine": ordine,
             "tavolo": ordine.tavolo,
             "voci_singole": voci_singole,
-            "coperti_menu_fisso": coperti_menu_fisso,
+            "coperti_menu_fisso_adulti": coperti_menu_fisso_adulti,
+            "coperti_menu_fisso_bambini": coperti_menu_fisso_bambini,
             "prezzo_fisso": ordine.prezzo_fisso_effettivo,
+            "prezzo_bambini": ordine.prezzo_bambini_effettivo,
             "totale_coperto": totale_coperto,
             "totale": totale,
             "dividi_per": dividi_per,

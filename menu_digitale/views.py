@@ -1,9 +1,16 @@
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.decorators import login_required
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .models import ImpostazioniMenu, Menu, categorie_con_piatti_per_menu
+from .models import Categoria, ImpostazioniMenu, Menu, categorie_con_piatti_per_menu, categorie_per_ruolo
+
+TITOLI_RUOLO = {
+    Categoria.RUOLO_VINI: "Carta dei Vini",
+    Categoria.RUOLO_DOLCI: "I Nostri Dolci",
+    Categoria.RUOLO_BEVANDE: "Bevande & Caffetteria",
+}
 
 
 def menu_pubblico(request):
@@ -16,6 +23,25 @@ def menu_pubblico(request):
         request,
         "menu_digitale/menu.html",
         {"categorie": categorie, "menu_attivo": menu_attivo, "impostazioni": impostazioni},
+    )
+
+
+def menu_ruolo(request, ruolo):
+    """Pagina pubblica dedicata a Vini, Dolci o Bevande — raggiunta con un
+    pulsante dalla pagina principale del menù, sempre riferita al Menù
+    ATTIVO in questo momento."""
+    if ruolo not in TITOLI_RUOLO:
+        raise Http404
+    menu_attivo = Menu.ottieni_attivo()
+    categorie = categorie_per_ruolo(menu_attivo, ruolo)
+    return render(
+        request,
+        "menu_digitale/menu_ruolo.html",
+        {
+            "categorie": categorie,
+            "menu_attivo": menu_attivo,
+            "titolo": TITOLI_RUOLO[ruolo],
+        },
     )
 
 
@@ -52,13 +78,16 @@ def elenco_menu(request):
 
 @login_required
 def impostazioni_menu(request):
-    """Impostazioni GENERALI del locale, valide per tutti i menù (QR, soglia
-    ritardo cucina, coperto). La modalità e il prezzo del menù fisso non sono
-    più qui: appartengono a ogni singola edizione di Menù, gestita da
-    /admin/menu_digitale/menu/."""
+    """Impostazioni GENERALI del locale (QR, soglia ritardo cucina, coperto)
+    più un riepilogo/gestione rapida del menù bambini dell'edizione attiva
+    (i suoi altri campi restano su /admin/menu_digitale/menu/). Due moduli
+    distinti sulla stessa pagina, ognuno con la propria azione — inviarne
+    uno non deve toccare i campi dell'altro."""
     impostazioni = ImpostazioniMenu.ottieni()
+    menu_attivo = Menu.ottieni_attivo()
     errore_prezzo = None
-    if request.method == "POST":
+
+    if request.method == "POST" and request.POST.get("azione") == "salva_generali":
         impostazioni.ordini_qr_abilitati = request.POST.get("ordini_qr_abilitati") == "on"
         impostazioni.coperto_attivo = request.POST.get("coperto_attivo") == "on"
 
@@ -80,7 +109,17 @@ def impostazioni_menu(request):
         if not errore_prezzo:
             return redirect("menu_digitale:impostazioni")
 
-    menu_attivo = Menu.ottieni_attivo()
+    elif request.method == "POST" and request.POST.get("azione") == "salva_bambini" and menu_attivo:
+        menu_attivo.menu_bambini_attivo = request.POST.get("menu_bambini_attivo") == "on"
+        prezzo_bambini_raw = request.POST.get("prezzo_menu_bambini_a_persona", "").strip()
+        if prezzo_bambini_raw:
+            try:
+                menu_attivo.prezzo_menu_bambini_a_persona = Decimal(prezzo_bambini_raw)
+            except InvalidOperation:
+                pass
+        menu_attivo.save()
+        return redirect("menu_digitale:impostazioni")
+
     return render(
         request,
         "menu_digitale/impostazioni.html",

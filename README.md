@@ -922,7 +922,57 @@ si vede tutto a colpo d'occhio. Toccando un piatto si aggiunge subito (i tocchi 
 sullo stesso piatto si sommano, non creano righe doppie) e la finestra **si riapre da
 sola**, pronta per il piatto successivo, senza doverla riaprire ogni volta a mano.
 
-## 62. Prossimo passo
+## 63. Blocco grande: Vini/Dolci/Bevande, Menù bambini, restyling menù pubblico
+
+⚠️ **7 nuove migrazioni** (4 menu_digitale, 2 ordini, 1 prenotazioni) — il blocco più ricco
+di funzionalità nuove finora:
+
+```
+python manage.py migrate
+```
+
+### 🗑️ Rimossa "Entrambi visibili"
+Non serviva più (si comportava identica a "Solo carta" dopo le ultime semplificazioni) e
+generava confusione. Restano solo "Solo menù fisso" e "Solo carta". Eventuali menù già
+impostati su "Entrambi" vengono convertiti automaticamente a "Carta" dalla migrazione.
+
+### 🍷🍰☕ Vini, Dolci, Bevande — pagine dedicate
+Ogni Categoria ha ora un **"Ruolo nel menù"**: Portata (resta nella pagina principale),
+Vini, Dolci, o Bevande (comprende caffè e digestivi). Potete continuare a dividere i vini
+in più categorie (Rossi, Bianchi, Bollicine...): basta segnarle tutte con ruolo "Vini",
+compariranno raggruppate nella stessa pagina.
+
+La pagina principale del menù ora mostra **solo le Portate**, con tre pulsanti in fondo
+che portano a pagine dedicate — **"Carta dei Vini"**, **"I Nostri Dolci"**,
+**"Bevande & Caffetteria"** — curate con lo stesso stile del resto del sito. Anche il
+link "guarda i menù futuri" è diventato un vero pulsante invece di un semplice link.
+
+### 🎨 Restyling del menù principale
+Colonna più stretta e centrata, ogni piatto con testo centrato (non più nome-a-sinistra
+prezzo-a-destra), una **cornice sottile a doppio bordo** con piccoli ornamenti a foglia
+negli angoli — la sensazione di una vera carta del menù stampata con cura. Applicato sia
+alla pagina pubblica sia a quella mostrata dal QR al tavolo.
+
+### 👶 Menù bambini
+Per le edizioni a menù fisso: un percorso **completamente dedicato**, con piatti propri
+e prezzo proprio.
+- Si gestisce da `/admin/menu_digitale/menu/` (scheda del Menù): interruttore
+  **"Menù bambini attivo"** (acceso di default appena il menù è fisso, disattivabile per
+  singola edizione), prezzo a persona, e l'elenco a doppia colonna con checkbox per
+  scegliere quali piatti ne fanno parte
+- Riepilogo/gestione rapida anche da **Impostazioni** (staff), senza dover sempre passare
+  da /admin/
+- **In prenotazione**: nuovo campo "Di cui bambini" (sempre visibile) e "Seggioloni
+  richiesti" (compare solo se ci sono bambini) — utile alla sala per organizzarsi, a
+  prescindere da quale menù sarà attivo quel giorno
+- **Alla pagina del tavolo**: nuovo campo "di cui bambini" (visibile solo se il menù
+  bambini è attivo per quell'edizione) — genera in automatico le portate bambini,
+  esattamente come già succede per gli adulti col fisso
+- **Prezzo congelato** all'apertura del tavolo, stessa protezione anti-errore già usata
+  per il resto (cambiare il prezzo a metà servizio non altera i conti aperti)
+- **Preconto**: adulti e bambini mostrati come righe separate, ciascuno al proprio prezzo
+
+## 64. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.
