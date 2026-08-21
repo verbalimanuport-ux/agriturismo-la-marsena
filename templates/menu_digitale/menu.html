@@ -44,18 +44,6 @@
       </div>
     {% endif %}
 
-    {% if piatti_bambini %}
-      <div class="mb-5 p-3" style="background-color: var(--color-bg); border-radius: var(--radius-md); border: 1px dashed var(--color-border);">
-        <h2 class="h5 mb-1" style="color: var(--color-primary); font-family:'Fraunces',serif;">👶 Menù Bambini</h2>
-        {% if menu_attivo.prezzo_menu_bambini_a_persona > 0 %}
-          <p class="small fw-semibold mb-2" style="color: var(--color-muted);">&euro;{{ menu_attivo.prezzo_menu_bambini_a_persona }} a persona</p>
-        {% endif %}
-        <p class="mb-0 small" style="color: var(--color-muted);">
-          {% for piatto in piatti_bambini %}{{ piatto.nome }}{% if not forloop.last %} · {% endif %}{% endfor %}
-        </p>
-      </div>
-    {% endif %}
-
     {% for categoria in categorie %}
       <div class="mb-4 {% if not forloop.first %}mt-5{% endif %}">
         <h2 class="h4 text-uppercase mb-0" style="color: var(--color-primary); letter-spacing: 0.12em; font-size: 1.05rem;">{{ categoria.nome }}</h2>
@@ -87,6 +75,19 @@
     {% empty %}
       <p class="text-muted mt-5">Il menu sarà disponibile a breve. Torna a trovarci!</p>
     {% endfor %}
+
+    {% if piatti_bambini %}
+      <div style="height:1px; background: var(--color-border); margin-top: 2.5rem; margin-bottom: 1.75rem;"></div>
+      <div class="p-3" style="background-color: var(--color-bg); border-radius: var(--radius-md); border: 1px dashed var(--color-border);">
+        <h2 class="h5 mb-1" style="color: var(--color-primary); font-family:'Fraunces',serif;">👶 Menù Bambini</h2>
+        {% if menu_attivo.prezzo_menu_bambini_a_persona > 0 %}
+          <p class="small fw-semibold mb-2" style="color: var(--color-muted);">&euro;{{ menu_attivo.prezzo_menu_bambini_a_persona }} a persona</p>
+        {% endif %}
+        <p class="mb-0 small" style="color: var(--color-muted);">
+          {% for piatto in piatti_bambini %}{{ piatto.nome }}{% if not forloop.last %} · {% endif %}{% endfor %}
+        </p>
+      </div>
+    {% endif %}
 
     <div style="position:absolute; bottom:10px; left:14px; opacity:0.35; color: var(--color-primary); transform:scaleY(-1);">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C12 2 8 7 8 12C8 16 10 20 12 22C14 20 16 16 16 12C16 7 12 2 12 2Z" stroke="currentColor" stroke-width="1.5"/></svg>
