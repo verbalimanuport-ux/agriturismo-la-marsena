@@ -1064,7 +1064,14 @@ come voci assegnabili (ciascuna al proprio prezzo), esattamente come i piatti ne
 carta — stesso strumento, stesso modo di usarlo, solo con quote invece di pietanze. La
 "divisione in parti uguali" resta comunque disponibile per chi vuole un calcolo veloce.
 
-## 70. Prossimo passo
+## 71. Riordino pagina menù: bambini spostato in fondo
+
+Nessuna migrazione — solo template. L'ordine ora è: prezzo del menù fisso → elenco delle
+portate → riquadro "👶 Menù Bambini" in fondo (con un separatore sottile prima, dato che
+ora chiude la pagina invece di stare in mezzo). Applicato sia al menù pubblico sia alla
+pagina mostrata dal QR al tavolo.
+
+## 72. Prossimo passo
 
 Rimane il modulo **Prodotti dell'azienda agricola** (verdura e prodotti ordinabili), da
 aggiungere seguendo la stessa struttura.
